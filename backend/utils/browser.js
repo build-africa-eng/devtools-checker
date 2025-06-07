@@ -1,10 +1,18 @@
 const { chromium } = require('playwright');
+const fs = require('fs');
+const path = require('path');
 
 async function analyzeUrl(url) {
+  const cacheDir = path.join('/tmp', '.cache', 'ms-playwright'); // Use /tmp as a writable directory
+  if (!fs.existsSync(cacheDir)) {
+    fs.mkdirSync(cacheDir, { recursive: true });
+  }
+  process.env.PLAYWRIGHT_BROWSERS_PATH = cacheDir; // Set custom cache path
+
   try {
     console.log('Launching Playwright for URL:', url);
     const browser = await chromium.launch({
-      headless: true, // Changed from 'new' to true
+      headless: true,
       args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--single-process'],
       timeout: 60000,
     });
