@@ -1,0 +1,3 @@
+name = "devtools-checker"
+main = "index.js"
+compatibility_date = "2025-06-07"
