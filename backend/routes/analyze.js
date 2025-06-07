@@ -5,7 +5,6 @@ const router = express.Router();
 router.post('/', async (req, res) => {
   const { url } = req.body;
 
-  // Validate URL
   if (!url) {
     return res.status(400).json({ error: 'URL is required' });
   }
@@ -20,7 +19,7 @@ router.post('/', async (req, res) => {
     res.json(data);
   } catch (error) {
     console.error(`Analysis failed for ${url}:`, error.message, error.stack);
-    res.status(500).json({ error: 'Analysis failed', details: error.message });
+    res.status(500).json({ error: 'Analysis failed', details: error.message, stack: error.stack });
   }
 });
 
