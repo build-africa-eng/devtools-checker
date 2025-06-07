@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import UrlInput from './components/UrlInput';
 import Tab from './components/Tab';
-import ConsoleView from './pages/ConsoleView';
-import NetworkView from './pages/NetworkView';
+import ConsoleLog from './components/ConsoleLog';
+import NetworkEntry from './components/NetworEntry';
 
 function App() {
   const [analysisData, setAnalysisData] = useState(null);
