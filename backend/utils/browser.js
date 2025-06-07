@@ -1,10 +1,10 @@
-const playwright = require('playwright');
+const { chromium } = require('playwright');
 
 async function analyzeUrl(url) {
   try {
     console.log('Launching Playwright for URL:', url);
-    const browser = await playwright.chromium.launch({
-      headless: 'new',
+    const browser = await chromium.launch({
+      headless: true, // Changed from 'new' to true
       args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--single-process'],
       timeout: 60000,
     });
@@ -21,19 +21,21 @@ async function analyzeUrl(url) {
       });
     });
 
-    await page.setRequestInterception(true);
-    page.on('request', (req) => {
+    await page.route('**/*', (route) => {
       requests.push({
-        url: req.url(),
-        method: req.method(),
-        resourceType: req.resourceType(),
+        url: route.request().url(),
+        method: route.request().method(),
+        resourceType: route.request().resourceType(),
         status: null,
       });
-      req.continue();
+      route.continue();
     });
-    page.on('response', (res) => {
-      const req = requests.find((r) => r.url === res.url());
-      if (req) req.status = res.status();
+
+    await page.route('**/*', async (route) => {
+      const response = await route.fetch();
+      const req = requests.find((r) => r.url === response.url());
+      if (req) req.status = response.status();
+      route.fulfill({ response });
     });
 
     console.log('Navigating to:', url);
