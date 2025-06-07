@@ -4,7 +4,7 @@ services:
     env: node
     plan: free
     region: oregon
-    buildCommand: npm install && npx playwright install
+    buildCommand: npm install && npx playwright install --with-deps chromium
     startCommand: node index.js
     envVars:
       - key: PORT
