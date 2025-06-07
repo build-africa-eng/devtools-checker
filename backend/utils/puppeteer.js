@@ -6,8 +6,8 @@ async function analyzeUrl(url) {
     const browser = await puppeteer.launch({
       headless: 'new',
       args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
-      executablePath: process.env.NODE_ENV === 'production' ? '/usr/bin/chromium' : null,
-      timeout: 60000, // Increased timeout to 60s
+      executablePath: process.env.NODE_ENV === 'production' ? '/usr/bin/chromium-browser' : null,
+      timeout: 60000, // 60-second timeout
     });
     const page = await browser.newPage();
     const logs = [];
@@ -44,7 +44,7 @@ async function analyzeUrl(url) {
     return { logs, requests };
   } catch (error) {
     console.error('Puppeteer error:', error.message, error.stack);
-    throw new Error('Analysis failed: ' + error.message);
+    throw new Error(`Analysis failed: ${error.message}`);
   }
 }
 
