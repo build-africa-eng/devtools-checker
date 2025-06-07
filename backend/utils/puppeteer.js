@@ -1,13 +1,22 @@
 const puppeteer = require('puppeteer');
+const fs = require('fs');
+const path = require('path');
 
 async function analyzeUrl(url) {
+  const cacheDir = path.join('/tmp', '.cache', 'puppeteer'); // Use /tmp as a writable directory on Render
+  if (!fs.existsSync(cacheDir)) {
+    fs.mkdirSync(cacheDir, { recursive: true });
+  }
+  process.env.PUPPETEER_CACHE_DIR = cacheDir;
+
   try {
     console.log('Launching Puppeteer for URL:', url);
     const browser = await puppeteer.launch({
       headless: 'new',
       args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--single-process'],
-      // Remove explicit executablePath to let Puppeteer download Chromium
       timeout: 60000,
+      // Ensure Puppeteer downloads Chromium if not present
+      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
     });
     const page = await browser.newPage();
     const logs = [];
