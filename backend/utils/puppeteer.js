@@ -1,4 +1,4 @@
-const puppeteer = require('puppeteer');
+lconst puppeteer = require('puppeteer');
 
 async function analyzeUrl(url) {
   const browser = await puppeteer.launch({ headless: 'new' });
@@ -6,7 +6,6 @@ async function analyzeUrl(url) {
   const logs = [];
   const requests = [];
 
-  // Capture console logs
   page.on('console', (msg) => {
     logs.push({
       type: msg.type(),
@@ -15,7 +14,6 @@ async function analyzeUrl(url) {
     });
   });
 
-  // Capture network requests
   await page.setRequestInterception(true);
   page.on('request', (req) => {
     requests.push({
@@ -31,9 +29,7 @@ async function analyzeUrl(url) {
     if (req) req.status = res.status();
   });
 
-  // Navigate to URL
   await page.goto(url, { waitUntil: 'networkidle2' });
-
   await browser.close();
   return { logs, requests };
 }
