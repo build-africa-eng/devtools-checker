@@ -3,10 +3,8 @@ const cors = require('cors');
 const analyzeRoute = require('./routes/analyze');
 
 const app = express();
-app.use(cors());
+app.use(cors({ origin: 'https://devtools-checker.pages.dev' }));
 app.use(express.json());
-
-// Routes
 app.use('/analyze', analyzeRoute);
 
 const PORT = process.env.PORT || 5000;
