@@ -35,5 +35,4 @@ services:
       ca-certificates \
       libappindicator3-1 \
       libfontconfig1 \
-      wget \
-      chromium-browser
+      wget
