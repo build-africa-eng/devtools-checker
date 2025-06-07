@@ -1,4 +1,4 @@
-lconst puppeteer = require('puppeteer');
+const puppeteer = require('puppeteer');
 
 async function analyzeUrl(url) {
   const browser = await puppeteer.launch({ headless: 'new' });
