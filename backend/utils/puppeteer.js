@@ -5,9 +5,9 @@ async function analyzeUrl(url) {
     console.log('Launching Puppeteer for URL:', url);
     const browser = await puppeteer.launch({
       headless: 'new',
-      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
+      args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--single-process'],
       executablePath: process.env.NODE_ENV === 'production' ? '/usr/bin/chromium-browser' : null,
-      timeout: 60000, // 60-second timeout
+      timeout: 60000,
     });
     const page = await browser.newPage();
     const logs = [];
