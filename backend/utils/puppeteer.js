@@ -6,7 +6,7 @@ async function analyzeUrl(url) {
     const browser = await puppeteer.launch({
       headless: 'new',
       args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--single-process'],
-      executablePath: process.env.NODE_ENV === 'production' ? '/usr/bin/chromium-browser' : null,
+      // Remove explicit executablePath to let Puppeteer download Chromium
       timeout: 60000,
     });
     const page = await browser.newPage();
