@@ -8,6 +8,7 @@
     "express": "^5.1.0",
     "cors": "^2.8.5",
     "playwright-core": "^1.52.0",
-    "playwright": "^1.52.0"
+    "playwright": "^1.52.0",
+    "chromium": "^3.0.3"
   }
 }
