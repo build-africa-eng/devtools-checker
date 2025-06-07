@@ -4,7 +4,7 @@ services:
     env: node
     plan: free
     region: oregon
-    buildCommand: npm install && npx playwright install --with-deps chromium
+    buildCommand: npm install && npx playwright install chromium
     startCommand: node index.js
     envVars:
       - key: PORT
@@ -12,27 +12,28 @@ services:
       - key: NODE_ENV
         value: production
     preDeployCommand: |
-      apt-get update && apt-get install -y \
-      libnss3 \
-      libatk1.0-0 \
-      libatk-bridge2.0-0 \
-      libcups2 \
-      libdrm2 \
-      libxkbcommon0 \
-      libxcomposite1 \
-      libxdamage1 \
-      libxrandr2 \
-      libgbm1 \
-      libpango-1.0-0 \
-      libcairo2 \
-      libasound2 \
-      libx11-xcb1 \
-      libxcursor1 \
-      libxfixes3 \
-      libxi6 \
-      libxtst6 \
-      fonts-liberation \
-      ca-certificates \
-      libappindicator3-1 \
-      libfontconfig1 \
-      wget
+      apt-get update
+      apt-get install -y --no-install-recommends \
+        libnss3 \
+        libatk1.0-0 \
+        libatk-bridge2.0-0 \
+        libcups2 \
+        libdrm2 \
+        libxkbcommon0 \
+        libxcomposite1 \
+        libxdamage1 \
+        libxrandr2 \
+        libgbm1 \
+        libpango-1.0-0 \
+        libcairo2 \
+        libasound2 \
+        libx11-xcb1 \
+        libxcursor1 \
+        libxfixes3 \
+        libxi6 \
+        libxtst6 \
+        fonts-liberation \
+        ca-certificates \
+        libappindicator3-1 \
+        libfontconfig1 \
+        wget
