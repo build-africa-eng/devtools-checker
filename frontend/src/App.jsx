@@ -2,7 +2,7 @@ import { useState } from 'react';
 import UrlInput from './components/UrlInput';
 import Tab from './components/Tab';
 import ConsoleLog from './components/ConsoleLog';
-import NetworkEntry from './components/NetworEntry';
+import NetworkEntry from './components/NetworkEntry';
 
 function App() {
   const [analysisData, setAnalysisData] = useState(null);
