@@ -1,5 +1,5 @@
 const express = require('express');
-const { analyzeUrl } = require('../utils/puppeteer');
+const { analyzeUrl } = require('../utils/browser'); // Update path
 const router = express.Router();
 
 router.post('/', async (req, res) => {
