@@ -1,22 +1,12 @@
-const puppeteer = require('puppeteer');
-const fs = require('fs');
-const path = require('path');
+const playwright = require('playwright');
 
 async function analyzeUrl(url) {
-  const cacheDir = path.join('/tmp', '.cache', 'puppeteer'); // Use /tmp as a writable directory on Render
-  if (!fs.existsSync(cacheDir)) {
-    fs.mkdirSync(cacheDir, { recursive: true });
-  }
-  process.env.PUPPETEER_CACHE_DIR = cacheDir;
-
   try {
-    console.log('Launching Puppeteer for URL:', url);
-    const browser = await puppeteer.launch({
+    console.log('Launching Playwright for URL:', url);
+    const browser = await playwright.chromium.launch({
       headless: 'new',
       args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--single-process'],
       timeout: 60000,
-      // Ensure Puppeteer downloads Chromium if not present
-      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
     });
     const page = await browser.newPage();
     const logs = [];
@@ -52,7 +42,7 @@ async function analyzeUrl(url) {
     console.log('Analysis completed:', { logsLength: logs.length, requestsLength: requests.length });
     return { logs, requests };
   } catch (error) {
-    console.error('Puppeteer error:', error.message, error.stack);
+    console.error('Playwright error:', error.message, error.stack);
     throw new Error(`Analysis failed: ${error.message}`);
   }
 }
