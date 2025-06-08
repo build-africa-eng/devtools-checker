@@ -1,53 +1,52 @@
 import React from 'react';
-import { AlertCircle, Info, Terminal, TriangleAlert } from 'lucide-react';
+import { AlertCircle, AlertTriangle, Info, MessageCircle } from 'lucide-react';
 
-const ConsoleLog = ({ logs = [] }) => {
-  const getIcon = (level) => {
+function ConsoleLog({ logs }) {
+  console.log('ConsoleLog logs:', logs);
+  if (!logs || logs.length === 0) {
+    return <p className="text-gray-400">No console logs found</p>;
+  }
+
+  const getLogIcon = (level) => {
     switch (level) {
       case 'error':
-        return <AlertCircle className="text-red-500 w-5 h-5" />;
+        return <AlertCircle className="h-4 w-4 text-red-500" />;
       case 'warn':
-        return <TriangleAlert className="text-yellow-400 w-5 h-5" />;
+        return <AlertTriangle className="h-4 w-4 text-yellow-500" />;
       case 'info':
-        return <Info className="text-blue-400 w-5 h-5" />;
+        return <Info className="h-4 w-4 text-blue-500" />;
       default:
-        return <Terminal className="text-gray-300 w-5 h-5" />;
-    }
-  };
-
-  const getStyle = (level) => {
-    switch (level) {
-      case 'error':
-        return 'bg-red-950 border-red-700 text-red-300';
-      case 'warn':
-        return 'bg-yellow-900 border-yellow-600 text-yellow-200';
-      case 'info':
-        return 'bg-blue-900 border-blue-600 text-blue-200';
-      default:
-        return 'bg-gray-800 border-gray-700 text-gray-300';
+        return <MessageCircle className="h-4 w-4 text-gray-500" />;
     }
   };
 
   return (
     <div className="space-y-2">
-      {logs.length === 0 ? (
-        <p className="text-sm text-gray-500 text-center italic">No console logs found.</p>
-      ) : (
-        logs.map((log, index) => (
-          <div
-            key={index}
-            className={`flex items-start gap-2 p-3 border rounded-lg ${getStyle(log.level)}`}
-          >
-            <div className="pt-1">{getIcon(log.level)}</div>
-            <div className="text-sm whitespace-pre-wrap break-words flex-1">
-              <strong className="block font-medium mb-1">{log.level.toUpperCase()}</strong>
-              {log.message}
-            </div>
+      {logs.map((log, index) => (
+        <div
+          key={index}
+          className={`p-2 rounded flex items-start gap-2 ${
+            log.level === 'error' ? 'bg-red-900' :
+            log.level === 'warn' ? 'bg-yellow-900' :
+            log.level === 'info' ? 'bg-blue-900' : 'bg-gray-800'
+          }`}
+        >
+          {getLogIcon(log.level)}
+          <div className="flex-1">
+            <p className="font-mono text-sm">{log.message}</p>
+            {log.timestamp && (
+              <p className="text-xs text-gray-400">{log.timestamp}</p>
+            )}
+            {log.location && (
+              <p className="text-xs text-gray-400">
+                {log.location.url}:{log.location.lineNumber}
+              </p>
+            )}
           </div>
-        ))
-      )}
+        </div>
+      ))}
     </div>
   );
-};
+}
 
 export default ConsoleLog;
