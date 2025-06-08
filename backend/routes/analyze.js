@@ -1,68 +1,50 @@
-const express = require('express');
-const { analyzeUrl } = require('../utils/puppeteer');
-const rateLimit = require('express-rate-limit');
-const winston = require('winston');
+lconst express = require('express');
 const router = express.Router();
+const rateLimit = require('express-rate-limit');
+const { analyzeUrl } = require('./analyzeUrl'); // adjust path if needed
+const isValidUrl = require('./utils/isValidUrl'); // assumes helper for URL validation
+const logger = require('./logger'); // assumes Winston or custom logger
 
-// Configure Winston logger
-const logger = winston.createLogger({
-  level: 'info',
-  format: winston.format.combine(
-    winston.format.timestamp(),
-    winston.format.json()
-  ),
-  transports: [
-    new winston.transports.Console(),
-    new winston.transports.File({ filename: 'logs/error.log', level: 'error' }),
-  ],
-});
-
-// Rate limiter: 100 requests per 15 minutes per IP
+// Optional rate limiter (adjust per your needs)
 const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // Limit each IP to 100 requests
-  message: { error: 'Too many requests, please try again later' },
+  windowMs: 1 * 60 * 1000, // 1 minute
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: 'Too many requests. Please try again later.',
 });
-
-// Validate URL
-const isValidUrl = (url) => {
-  try {
-    const parsed = new URL(url);
-    // Only allow http or https protocols
-    return ['http:', 'https:'].includes(parsed.protocol);
-  } catch {
-    return false;
-  }
-};
 
 router.post('/', limiter, async (req, res) => {
-  const { url } = req.body;
+  const { url, options } = req.body;
   const ip = req.ip || req.connection.remoteAddress;
 
+  // --- Validate URL ---
   if (!url || typeof url !== 'string' || !url.trim()) {
-    logger.warn(`Invalid URL request from ${ip}: URL missing or empty`);
-    return res.status(400).json({ error: 'A valid URL is required' });
+    logger.warn(`Invalid request from ${ip}: Missing or empty URL`);
+    return res.status(400).json({ error: 'A valid URL is required.' });
   }
 
   if (!isValidUrl(url)) {
-    logger.warn(`Invalid URL request from ${ip}: ${url}`);
-    return res.status(400).json({ error: 'Invalid URL format (must be http or https)' });
+    logger.warn(`Invalid request from ${ip}: ${url}`);
+    return res.status(400).json({ error: 'Invalid URL format. Must start with http or https.' });
   }
 
   try {
-    logger.info(`Analyzing URL: ${url} from ${ip}`);
-    const data = await analyzeUrl(url);
+    logger.info(`Starting analysis for ${url} from ${ip}. Options: ${JSON.stringify(options)}`);
 
-    if (data.error) {
-      logger.error(`Analysis failed for ${url}: ${data.error}`);
-      return res.status(500).json({ error: 'Analysis failed', message: 'Unable to process the page' });
+    const analysisData = await analyzeUrl(url, options);
+
+    if (analysisData.error) {
+      logger.error(`Analysis failed for ${url}: ${analysisData.error}. Details: ${analysisData.details}`);
+      return res.status(500).json({ error: 'Analysis failed', message: analysisData.error });
     }
 
-    res.json({ data });
     logger.info(`Successfully analyzed ${url} for ${ip}`);
+    return res.json(analysisData);
+
   } catch (error) {
-    logger.error(`Unexpected error for ${url}: ${error.message}`);
-    res.status(500).json({ error: 'Analysis failed', message: 'An unexpected error occurred' });
+    logger.error(`Unexpected error for ${url} from ${ip}: ${error.stack || error.message}`);
+    return res.status(500).json({ error: 'Analysis failed', message: 'An unexpected error occurred.' });
   }
 });
 
