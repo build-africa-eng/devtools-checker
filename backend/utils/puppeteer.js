@@ -2,11 +2,11 @@ const puppeteer = require('puppeteer-extra');
 const StealthPlugin = require('puppeteer-extra-plugin-stealth');
 const AdblockerPlugin = require('puppeteer-extra-plugin-adblocker');
 
+// Apply plugins to puppeteer
 puppeteer.use(StealthPlugin());
 puppeteer.use(AdblockerPlugin({ blockTrackers: true }));
 
-// A more streamlined set of launch args for general use.
-// Your original args are kept below in case they are needed for a specific environment.
+// Optimized launch arguments for performance and stability in various environments
 const launchArgs = [
   '--no-sandbox',
   '--disable-setuid-sandbox',
@@ -14,7 +14,7 @@ const launchArgs = [
   '--disable-accelerated-2d-canvas',
   '--no-first-run',
   '--no-zygote',
-  '--single-process', // This can be useful in containers
+  '--single-process',
   '--disable-gpu',
 ];
 
@@ -24,7 +24,7 @@ const launchArgs = [
  * @param {object} [options] Optional settings.
  * @param {boolean} [options.includeHtml=false] Whether to include the full page HTML.
  * @param {boolean} [options.includeScreenshot=false] Whether to include a Base64-encoded screenshot.
- * @returns {Promise<object>} A promise that resolves to the analysis data.
+ * @returns {Promise<object>} A promise that resolves to an object containing the analysis data.
  */
 async function analyzeUrl(url, options = {}) {
   let browser;
@@ -32,7 +32,7 @@ async function analyzeUrl(url, options = {}) {
     browser = await puppeteer.launch({
       headless: 'new',
       args: launchArgs,
-      timeout: 180000,
+      timeout: 180000, // 3-minute timeout for browser launch
       executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
     });
 
@@ -41,21 +41,20 @@ async function analyzeUrl(url, options = {}) {
 
     const logs = [];
     const requests = [];
+    // Use a Map for O(1) lookups to match responses to requests, which is much faster.
+    const requestMap = new Map();
     const MAX_LOGS = 200;
     const MAX_REQUESTS = 500;
 
+    // --- Set up page event listeners ---
     page.on('console', (msg) => {
       if (logs.length < MAX_LOGS) {
-        try {
-          logs.push({
-            level: msg.type(),
-            message: msg.text(),
-            location: msg.location(),
-            timestamp: new Date().toISOString(),
-          });
-        } catch (e) {
-          // In case the message is not serializable
-        }
+        logs.push({
+          level: msg.type(),
+          message: msg.text(),
+          location: msg.location(),
+          timestamp: new Date().toISOString(),
+        });
       }
     });
 
@@ -63,30 +62,39 @@ async function analyzeUrl(url, options = {}) {
 
     page.on('request', (req) => {
       const resourceType = req.resourceType();
-      if (['image', 'media', 'font'].includes(resourceType)) {
-        return req.abort(); // Abort more resource types to speed up
+      // Abort non-essential resources to significantly speed up analysis
+      if (['image', 'media', 'font', 'stylesheet'].includes(resourceType)) {
+        return req.abort();
       }
+
       if (requests.length < MAX_REQUESTS) {
-        requests.push({
+        const requestData = {
           url: req.url(),
           method: req.method(),
           type: resourceType,
-          status: null,
-          startTime: process.hrtime.bigint(), // Use high-resolution time
-        });
+          status: null, // To be filled by the 'response' event
+          time: -1, // To be calculated on response
+          startTime: process.hrtime.bigint(),
+        };
+        requests.push(requestData);
+        // Map the request object to its URL for quick lookup later
+        requestMap.set(req.id, requestData);
       }
       req.continue().catch(() => {});
     });
 
-    page.on('response', (res) => {
-      const match = [...requests].reverse().find((r) => r.url === res.url() && r.status === null);
-      if (match) {
-        match.status = res.status();
+    page.on('response', async (res) => {
+      // Find the corresponding request in our map
+      const requestData = requestMap.get(res.request().id);
+      if (requestData) {
+        requestData.status = res.status();
         const endTime = process.hrtime.bigint();
-        match.time = Number(endTime - match.startTime) / 1e6; // a more precise duration in ms
+        // Calculate duration in milliseconds with high precision
+        requestData.time = Number(endTime - requestData.startTime) / 1e6;
       }
     });
-    
+
+    // --- Navigate and gather data ---
     await page.setUserAgent(
       'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36'
     );
@@ -94,44 +102,39 @@ async function analyzeUrl(url, options = {}) {
     await page.setViewport({ width: 1366, height: 768 });
 
     await page.goto(url, {
-      waitUntil: 'networkidle2',
-      timeout: 60000,
+      waitUntil: 'networkidle2', // Wait until the network is quiet
+      timeout: 60000, // 1-minute timeout for page navigation
     });
-    
-    // --- New Data Collection ---
+
     const pageTitle = await page.title();
     const html = options.includeHtml ? await page.content() : undefined;
     const screenshot = options.includeScreenshot ? await page.screenshot({ encoding: 'base64' }) : undefined;
 
-    // Mark any requests that never completed
-    requests.forEach((r) => {
-      if (r.status === null) r.time = -1; // Timed out or blocked
-    });
-
     return {
       title: pageTitle,
       logs: logs.slice(0, MAX_LOGS),
-      requests: requests.slice(0, MAX_REQUESTS),
+      requests,
       html,
       screenshot,
       warning:
         logs.length >= MAX_LOGS || requests.length >= MAX_REQUESTS
-          ? 'Data truncated due to high volume'
+          ? 'Data truncated: The page generated a high volume of logs or requests.'
           : undefined,
     };
   } catch (error) {
-    console.error(`Puppeteer error for ${url}:`, error.message);
-    let errorMessage = 'Unable to process the page.';
+    // Provide more specific, user-friendly error messages
+    let errorMessage = 'Unable to process the page. The target website may be down or blocking automated tools.';
     if (error.name === 'TimeoutError') {
-      errorMessage = `Navigation timeout: The page took too long to load.`;
+      errorMessage = `Navigation Timeout: The website took too long to load or respond.`;
     }
+    console.error(`Puppeteer error for ${url}:`, error.message);
     return {
       error: errorMessage,
-      details: error.message,
+      details: error.message, // Keep technical details for debugging
     };
   } finally {
     if (browser) {
-      await browser.close().catch(() => {});
+      await browser.close().catch(e => console.error(`Failed to close browser: ${e.message}`));
     }
   }
 }
