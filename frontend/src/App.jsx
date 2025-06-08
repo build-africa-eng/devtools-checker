@@ -3,16 +3,19 @@ import UrlInput from './components/UrlInput';
 import Tab from './components/Tab';
 import ConsoleView from './pages/ConsoleView';
 import NetworkView from './pages/NetworkView';
+import ExportButtons from './components/ExportButtons';
 
 function App() {
   const [analysisData, setAnalysisData] = useState(null);
   const [activeTab, setActiveTab] = useState('console');
+  const hasData = analysisData?.logs?.length || analysisData?.requests?.length;
 
   return (
     <div className="min-h-screen bg-gray-900 text-white flex flex-col">
       <div className="p-4">
         <h1 className="text-2xl font-bold mb-4">DevTools Checker</h1>
         <UrlInput setAnalysisData={setAnalysisData} />
+        {hasData && <ExportButtons data={analysisData} />}
       </div>
       <div className="flex border-b border-gray-700">
         <Tab label="Console" isActive={activeTab === 'console'} onClick={() => setActiveTab('console')} />
