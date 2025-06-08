@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import UrlInput from './components/UrlInput';
 import Tab from './components/Tab';
 import ConsoleView from './pages/ConsoleView';
@@ -12,34 +12,25 @@ import { Moon, Sun } from 'lucide-react';
 function App() {
   const { analyze, loading, error, result } = useAnalysis();
   const [activeTab, setActiveTab] = useState('console');
-  const [filters, setFilters] = useState({ errors: false, failedRequests: false, warnings: false });
   const [logFilter, setLogFilter] = useState('all');
   const [requestFilter, setRequestFilter] = useState('all');
-  const [isDarkMode, setIsDarkMode] = useState(
-    window.matchMedia('(prefers-color-scheme: dark)').matches
-  );
+  const [isDarkMode, setIsDarkMode] = useState(false);
 
-  const analysisData = result || { logs: [], requests: [], warning: null };
-  const { filteredLogs, filteredRequests, warning } = useFilteredLogs(analysisData, filters, logFilter, requestFilter);
+  useEffect(() => {
+    setIsDarkMode(window.matchMedia('(prefers-color-scheme: dark)').matches);
+  }, []);
+
+  const { filteredLogs, filteredRequests, warning } = useFilteredLogs(result || { logs: [], requests: [], warning: null }, logFilter, requestFilter);
+
   const hasData = filteredLogs.length > 0 || filteredRequests.length > 0;
 
-  const handleToggleFilter = (filter) => {
-    setFilters((prev) => ({ ...prev, [filter]: !prev[filter] }));
-  };
-
-  const handleResetFilters = () => {
-    setFilters({ errors: false, failedRequests: false, warnings: false });
-    setLogFilter('all');
-    setRequestFilter('all');
-  };
-
-  const toggleDarkMode = () => {
+  const toggleDarkMode = useCallback(() => {
     setIsDarkMode((prev) => {
       const newMode = !prev;
       document.documentElement.classList.toggle('dark', newMode);
       return newMode;
     });
-  };
+  }, []);
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', isDarkMode);
@@ -64,7 +55,17 @@ function App() {
         {hasData && <ExportButtons data={{ logs: filteredLogs, requests: filteredRequests }} />}
       </div>
       <div className="p-4">
-        <FiltersPanel filters={filters} onToggle={handleToggleFilter} onReset={handleResetFilters} />
+        <FiltersPanel
+          filters={{ console: logFilter, network: requestFilter }}
+          onChange={(type, value) => {
+            if (type === 'console') setLogFilter(value);
+            if (type === 'network') setRequestFilter(value);
+          }}
+          onReset={() => {
+            setLogFilter('all');
+            setRequestFilter('all');
+          }}
+        />
       </div>
       <div className="flex border-b border-gray-700">
         <Tab label="Console" isActive={activeTab === 'console'} onClick={() => setActiveTab('console')} />
@@ -72,10 +73,10 @@ function App() {
       </div>
       <div className="flex-1 overflow-y-auto p-4">
         {activeTab === 'console' && (
-          <ConsoleView logs={filteredLogs} filters={filters} setFilter={setLogFilter} filter={logFilter} />
+          <ConsoleView logs={filteredLogs} filter={logFilter} setFilter={setLogFilter} />
         )}
         {activeTab === 'network' && (
-          <NetworkView requests={filteredRequests} filters={filters} setFilter={setRequestFilter} filter={requestFilter} />
+          <NetworkView requests={filteredRequests} filter={requestFilter} setFilter={setRequestFilter} />
         )}
       </div>
     </div>
