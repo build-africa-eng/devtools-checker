@@ -4,12 +4,12 @@
 
 :root {
   --color-background: #ffffff;
-  --color-background-dark: #202124; /* Dark theme like DevTools */
+  --color-background-dark: #202124; /* DevTools dark theme */
   --color-text: #333333;
-  --color-primary: #1a73e8; /* Blue for buttons/links */
-  --color-secondary: #34a853; /* Green for success */
-  --color-accent: #fbbc04; /* Yellow for warnings */
-  --color-error: #ea4335; /* Red for errors */
+  --color-primary: #1a73e8;
+  --color-secondary: #34a853;
+  --color-accent: #fbbc04;
+  --color-error: #ea4335;
   --font-family: 'Inter', sans-serif;
 }
 
@@ -27,18 +27,6 @@ body {
 
 /* Layout tweaks for smaller screens */
 @media (max-width: 640px) {
-  .player-items {
-    @apply flex-wrap gap-1;
-  }
-  .waveform-container {
-    @apply h-6;
-  }
-  .lyrics-container {
-    @apply max-h-20 text-xs;
-  }
-  .queue-container {
-    @apply max-w-[90vw] max-h-32 text-xs p-2;
-  }
   button {
     @apply min-w-[36px] min-h-[36px];
   }
