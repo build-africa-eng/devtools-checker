@@ -14,14 +14,16 @@ export function useAnalysis() {
     setError(null);
 
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/`, {
+      const apiUrl = `${import.meta.env.VITE_API_URL}/analyze`; // Changed to /analyze
+      console.log('Fetching from:', apiUrl);
+      const response = await fetch(apiUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url }),
       });
 
       if (!response.ok) {
-        throw new Error(`HTTP error! Status: ${response.status}`);
+        throw new Error(`HTTP error! Status: ${response.status} ${response.statusText}`);
       }
 
       const data = await response.json();
@@ -39,7 +41,7 @@ export function useAnalysis() {
       return formattedData;
     } catch (err) {
       console.error('Fetch Error:', err.message);
-      setError(err.message);
+      setError(`Failed to fetch data: ${err.message}`);
       setResult(null);
       return null;
     } finally {
