@@ -5,6 +5,7 @@ services:
     repo: https://github.com/build-africa-eng/devtools-checker
     branch: main
     buildCommand: npm install
+      npx puppeteer browsers install chrome
     startCommand: npm start
     preDeployCommand: |
       apt-get update
