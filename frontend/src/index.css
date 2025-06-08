@@ -1,3 +1,16 @@
+@import 'tailwindcss';
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Optional: Extend or customize below */
+
+@layer base {
+  html, body {
+    @apply h-full bg-gray-950 text-white;
+  }
+
+  *, *::before, *::after {
+    @apply box-border;
+  }
+}
