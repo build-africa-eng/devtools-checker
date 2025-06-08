@@ -9,6 +9,9 @@ router.post('/', async (req, res) => {
   }
   try {
     const data = await analyzeUrl(url);
+    if (data.error) {
+      return res.status(500).json({ error: 'Analysis failed', details: data.error });
+    }
     res.json(data);
   } catch (error) {
     console.error('Analysis error:', error.message);
