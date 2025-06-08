@@ -1,72 +1,58 @@
+// src/components/UrlInput.js
 import React, { useState } from 'react';
 import AnalyzeButton from './AnalyzeButton';
-import { useAnalysis } from '../hooks/useAnalysis'; // adjust path
 
-function UrlInput({ analyze }) {
+function UrlInput({ onAnalyze, loading, globalError }) {
   const [url, setUrl] = useState('');
-  const [localError, setLocalError] = useState(null);
-  const { loading, error } = useAnalysis();
+  const [localError, setLocalError] = useState('');
 
-  const isValidUrl = (str) => {
-    try {
-      new URL(str);
-      return true;
-    } catch {
-      return false;
-    }
-  };
-
-  const normalizeUrl = (str) => {
-    try {
-      return new URL(str).href;
-    } catch {
-      return new URL(`https://${str}`).href;
-    }
-  };
-
-  const handleAnalyze = async () => {
-    if (!url) {
-      setLocalError('URL is required');
+  const handleAnalyzeClick = () => {
+    if (!url.trim()) {
+      setLocalError('Please enter a URL.');
       return;
     }
-    if (!isValidUrl(url)) {
-      try {
-        normalizeUrl(url); // will throw if even with https:// it's invalid
-      } catch {
-        setLocalError('Please enter a valid URL');
-        return;
-      }
+
+    // Basic validation for a more user-friendly experience
+    let finalUrl = url;
+    if (!/^https?:\/\//i.test(url)) {
+      finalUrl = `https://${url}`;
     }
 
-    setLocalError(null);
-    const finalUrl = normalizeUrl(url);
-    const data = await analyze(finalUrl);
-    if (!data) {
-      console.log('Analysis failed, no data returned');
-    }
+    // Reset local error before new analysis
+    setLocalError('');
+    onAnalyze(finalUrl);
   };
 
   return (
-    <form onSubmit={(e) => { e.preventDefault(); handleAnalyze(); }} className="flex flex-col gap-2">
-      <input
-        type="url"
-        value={url}
-        onChange={(e) => setUrl(e.target.value)}
-        placeholder="Enter website URL (e.g., https://example.com)"
-        className={`p-2 rounded bg-gray-800 text-white border ${
-          error || localError ? 'border-red-500' : 'border-gray-700'
-        } focus:outline-none focus:border-blue-500`}
-        disabled={loading}
-        aria-label="Website URL input"
-        aria-describedby={error || localError ? 'url-error' : undefined}
-      />
-      <AnalyzeButton onAnalyze={handleAnalyze} loading={loading} disabled={!url || loading} />
-      {(error || localError) && (
-        <p id="url-error" className="text-red-500 text-sm">
-          {error || localError}
+    <div className="flex flex-col gap-2">
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          handleAnalyzeClick();
+        }}
+        className="flex flex-col sm:flex-row gap-2"
+      >
+        <input
+          type="text" // Use text to allow URLs without http prefix
+          value={url}
+          onChange={(e) => setUrl(e.target.value)}
+          placeholder="example.com"
+          className={`flex-grow p-2 rounded bg-white dark:bg-gray-800 text-gray-800 dark:text-white border ${
+            globalError || localError ? 'border-red-500' : 'border-gray-500'
+          } focus:outline-none focus:ring-2 focus:ring-blue-500`}
+          disabled={loading}
+          aria-label="Website URL input"
+          aria-invalid={!!(globalError || localError)}
+          aria-describedby="url-error"
+        />
+        <AnalyzeButton onAnalyze={handleAnalyzeClick} loading={loading} disabled={!url || loading} />
+      </form>
+      {(globalError || localError) && (
+        <p id="url-error" className="text-red-500 text-sm mt-1">
+          {globalError || localError}
         </p>
       )}
-    </form>
+    </div>
   );
 }
 
