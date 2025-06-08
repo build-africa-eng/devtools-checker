@@ -12,9 +12,11 @@ function App() {
   const { analyze, loading, error, result } = useAnalysis();
   const [activeTab, setActiveTab] = useState('console');
   const [filters, setFilters] = useState({ errors: false, failedRequests: false, warnings: false });
+  const [logFilter, setLogFilter] = useState('all');
+  const [requestFilter, setRequestFilter] = useState('all');
 
   const analysisData = result || { logs: [], requests: [], warning: null };
-  const { filteredLogs, filteredRequests, warning } = useFilteredLogs(analysisData, filters);
+  const { filteredLogs, filteredRequests, warning } = useFilteredLogs(analysisData, filters, logFilter, requestFilter);
   const hasData = filteredLogs.length > 0 || filteredRequests.length > 0;
 
   const handleToggleFilter = (filter) => {
@@ -23,6 +25,8 @@ function App() {
 
   const handleResetFilters = () => {
     setFilters({ errors: false, failedRequests: false, warnings: false });
+    setLogFilter('all');
+    setRequestFilter('all');
   };
 
   return (
@@ -42,8 +46,12 @@ function App() {
         <Tab label="Network" isActive={activeTab === 'network'} onClick={() => setActiveTab('network')} />
       </div>
       <div className="flex-1 overflow-y-auto p-4">
-        {activeTab === 'console' && <ConsoleView logs={filteredLogs} />}
-        {activeTab === 'network' && <NetworkView requests={filteredRequests} />}
+        {activeTab === 'console' && (
+          <ConsoleView logs={filteredLogs} filters={filters} setFilter={setLogFilter} filter={logFilter} />
+        )}
+        {activeTab === 'network' && (
+          <NetworkView requests={filteredRequests} filters={filters} setFilter={setRequestFilter} filter={requestFilter} />
+        )}
       </div>
     </div>
   );
