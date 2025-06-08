@@ -1,13 +1,12 @@
 import { useState } from 'react';
-import NetworkEntry from '../components/NetworkEntry';
+import NetworkLog from '../components/NetworkLog'; // Use NetworkLog instead of NetworkEntry
 
-function NetworkView({ requests }) {
+function NetworkView({ requests, filters }) {
   const [filter, setFilter] = useState('all');
-  const filtered = requests.filter(req => {
-    if (filter === 'all') return true;
-    if (filter === 'failed') return req.status >= 400;
-    if (filter === 'success') return req.status < 400;
-    return true;
+  const filteredRequests = requests.filter(req => {
+    if (filter === 'all' && !Object.values(filters).some(Boolean)) return true;
+    if (filters.failedRequests && req.status >= 400) return true;
+    return false;
   });
 
   return (
@@ -20,10 +19,10 @@ function NetworkView({ requests }) {
         </select>
       </div>
       <div className="space-y-2">
-        {filtered.length === 0 ? (
+        {filteredRequests.length === 0 ? (
           <p className="text-gray-500 text-center">No requests available</p>
         ) : (
-          filtered.map((req, index) => <NetworkEntry key={index} request={req} />)
+          filteredRequests.map((req, index) => <NetworkLog key={index} requests={[req]} />)
         )}
       </div>
     </>
