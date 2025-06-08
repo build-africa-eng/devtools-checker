@@ -1,4 +1,4 @@
-lconst express = require('express');
+const express = require('express');
 const router = express.Router();
 const rateLimit = require('express-rate-limit');
 const { analyzeUrl } = require('./analyzeUrl'); // adjust path if needed
