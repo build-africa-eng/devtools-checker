@@ -16,12 +16,19 @@ async function analyzeUrl(url) {
   const logs = [];
   const requests = [];
 
+  // Map console message types to expected levels
+  const typeToLevel = {
+    error: 'error',
+    warning: 'warn',
+    info: 'info',
+    log: 'log',
+  };
+
   page.on('console', (msg) => {
     logs.push({
-      type: msg.type(),
-      text: msg.text(),
+      level: typeToLevel[msg.type()] || 'log', // Map type to level
+      message: msg.text(), // Use text as message
       location: msg.location(),
-      important: ['error', 'warning'].includes(msg.type()),
     });
   });
 
@@ -30,18 +37,27 @@ async function analyzeUrl(url) {
     requests.push({
       url: req.url(),
       method: req.method(),
-      resourceType: req.resourceType(),
+      type: req.resourceType(), // Map resourceType to type
       status: null,
+      startTime: Date.now(), // Record start time
     });
     req.continue();
   });
 
   page.on('response', (res) => {
     const req = requests.find((r) => r.url === res.url());
-    if (req) req.status = res.status();
+    if (req) {
+      req.status = res.status();
+      req.time = Date.now() - req.startTime; // Calculate duration
+    }
   });
 
-  await page.goto(url, { waitUntil: 'networkidle2', timeout: 60000 });
+  try {
+    await page.goto(url, { waitUntil: 'networkidle2', timeout: 60000 });
+  } catch (error) {
+    console.error('Page navigation failed:', error.message);
+  }
+
   await browser.close();
 
   return { logs, requests };
