@@ -21,6 +21,10 @@ function App() {
     setFilters((prev) => ({ ...prev, [filter]: !prev[filter] }));
   };
 
+  const handleResetFilters = () => {
+    setFilters({ errors: false, failedRequests: false, warnings: false });
+  };
+
   return (
     <div className="min-h-screen bg-gray-900 text-white flex flex-col">
       <div className="p-4">
@@ -31,7 +35,7 @@ function App() {
         {hasData && <ExportButtons data={{ logs: filteredLogs, requests: filteredRequests }} />}
       </div>
       <div className="p-4">
-        <FiltersPanel filters={filters} onToggle={handleToggleFilter} />
+        <FiltersPanel filters={filters} onToggle={handleToggleFilter} onReset={handleResetFilters} />
       </div>
       <div className="flex border-b border-gray-700">
         <Tab label="Console" isActive={activeTab === 'console'} onClick={() => setActiveTab('console')} />
