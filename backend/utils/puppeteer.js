@@ -2,7 +2,6 @@ const puppeteer = require('puppeteer');
 
 async function analyzeUrl(url) {
   try {
-    console.log('Launching Puppeteer for URL:', url);
     const browser = await puppeteer.launch({
       headless: true,
       args: [
@@ -18,20 +17,31 @@ async function analyzeUrl(url) {
     const logs = [];
     const requests = [];
 
-    page.on('console', (msg) => {
-      const text = msg.text();
-      const type = msg.type();
-      const isImportant =
-        type === 'error' &&
-        !text.includes('favicon.ico') &&
-        !text.includes('Failed to load resource: net::ERR_UNKNOWN_URL_SCHEME');
+    const isImportantConsole = (msg) => {
+      const text = msg.text().toLowerCase();
 
-      logs.push({
-        type,
-        text,
+      // Filter out known noisy WebGL warnings
+      const ignorePatterns = [
+        'automatic fallback to software webgl has been deprecated',
+        'gpu stall due to readpixels',
+        'groupmarkernotset',
+      ];
+
+      const isNoise = ignorePatterns.some((pattern) => text.includes(pattern));
+      const isError = msg.type() === 'error';
+      const isImportantWarn = msg.type() === 'warning' && !isNoise;
+
+      return isError || isImportantWarn;
+    };
+
+    page.on('console', (msg) => {
+      const entry = {
+        type: msg.type(),
+        text: msg.text(),
         location: msg.location(),
-        important: isImportant,
-      });
+        important: isImportantConsole(msg),
+      };
+      logs.push(entry);
     });
 
     await page.setRequestInterception(true);
@@ -56,14 +66,8 @@ async function analyzeUrl(url) {
       }
     });
 
-    console.log('Navigating to:', url);
     await page.goto(url, { waitUntil: 'networkidle2', timeout: 60000 });
     await browser.close();
-
-    console.log('Analysis completed:', {
-      logsLength: logs.length,
-      requestsLength: requests.length,
-    });
 
     return { logs, requests };
   } catch (error) {
