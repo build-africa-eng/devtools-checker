@@ -1,11 +1,13 @@
 import { useState } from 'react';
 import ConsoleLog from '../components/ConsoleLog';
 
-function ConsoleView({ logs }) {
+function ConsoleView({ logs, filters }) {
   const [filter, setFilter] = useState('all');
   const filteredLogs = logs.filter(log => {
-    if (filter === 'all') return true;
-    return log.type === filter;
+    if (filter === 'all' && !Object.values(filters).some(Boolean)) return true;
+    if (filters.errors && log.level === 'error') return true;
+    if (filters.warnings && log.level === 'warn') return true;
+    return false;
   });
 
   return (
