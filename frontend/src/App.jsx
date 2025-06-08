@@ -33,7 +33,7 @@ function App() {
     <div className="min-h-screen bg-gray-900 text-white flex flex-col">
       <div className="p-4">
         <h1 className="text-2xl font-bold mb-4">DevTools Checker</h1>
-        <UrlInput setAnalysisData={analyze} />
+        <UrlInput analyze={analyze} />
         {error && <p className="text-red-500 mb-4">Error: {error}</p>}
         {warning && <p className="text-yellow-400 mb-4">Warning: {warning}</p>}
         {hasData && <ExportButtons data={{ logs: filteredLogs, requests: filteredRequests }} />}
