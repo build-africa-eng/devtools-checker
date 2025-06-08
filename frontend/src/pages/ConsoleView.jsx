@@ -24,7 +24,7 @@ function ConsoleView({ logs, filters }) {
         {filteredLogs.length === 0 ? (
           <p className="text-gray-500 text-center">No logs available</p>
         ) : (
-          filteredLogs.map((log, index) => <ConsoleLog key={index} log={log} />)
+          <ConsoleLog logs={filteredLogs} />
         )}
       </div>
     </>
