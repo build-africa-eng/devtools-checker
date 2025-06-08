@@ -14,7 +14,7 @@ export function useAnalysis() {
     setError(null);
 
     try {
-      const apiUrl = `${import.meta.env.VITE_API_URL}/analyze`; // Changed to /analyze
+      const apiUrl = `${import.meta.env.VITE_API_URL}/analyze`;
       console.log('Fetching from:', apiUrl);
       const response = await fetch(apiUrl, {
         method: 'POST',
@@ -23,25 +23,36 @@ export function useAnalysis() {
       });
 
       if (!response.ok) {
-        throw new Error(`HTTP error! Status: ${response.status} ${response.statusText}`);
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.details || `HTTP error! Status: ${response.status}`);
       }
 
       const data = await response.json();
       console.log('API Response:', data);
 
       if (data.error) {
-        throw new Error(data.error);
+        throw new Error(data.details || data.error);
       }
 
       const formattedData = {
-        logs: Array.isArray(data.logs) ? data.logs : [],
-        requests: Array.isArray(data.requests) ? data.requests : [],
+        logs: Array.isArray(data.logs) ? data.logs.map(log => ({
+          level: log.level || log.type || 'log',
+          message: log.message || log.text,
+          location: log.location,
+        })) : [],
+        requests: Array.isArray(data.requests) ? data.requests.map(req => ({
+          url: req.url,
+          method: req.method,
+          type: req.resourceType || req.type,
+          status: req.status,
+          time: req.time || 0,
+        })) : [],
       };
       setResult(formattedData);
       return formattedData;
     } catch (err) {
       console.error('Fetch Error:', err.message);
-      setError(`Failed to fetch data: ${err.message}`);
+      setError(`Analysis failed: ${err.message}`);
       setResult(null);
       return null;
     } finally {
