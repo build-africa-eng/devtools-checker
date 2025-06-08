@@ -23,7 +23,7 @@ function App() {
     <div className="min-h-screen bg-gray-900 text-white flex flex-col">
       <div className="p-4">
         <h1 className="text-2xl font-bold mb-4">DevTools Checker</h1>
-        <UrlInput setAnalysisData={(data) => analyze(data)} />
+        <UrlInput setAnalysisData={analyze} />
         {error && <p className="text-red-500 mb-4">{error}</p>}
         {hasData && <ExportButtons data={analysisData} />}
       </div>
