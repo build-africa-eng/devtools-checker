@@ -2,7 +2,7 @@ import React from 'react';
 import { CheckCircle, XCircle, Filter } from 'lucide-react';
 import NetworkLog from '../components/NetworkLog';
 
-function NetworkView({ requests, filter, setFilter }) {
+function NetworkView({ requests = [], filter = 'all', setFilter }) {
   console.log('NetworkView requests:', requests);
 
   const getIcon = (value) => {
@@ -15,6 +15,13 @@ function NetworkView({ requests, filter, setFilter }) {
         return <Filter className="w-4 h-4 text-text/70" />;
     }
   };
+
+  const filteredRequests =
+    filter === 'all'
+      ? requests
+      : filter === 'success'
+      ? requests.filter((req) => req.status && req.status < 400)
+      : requests.filter((req) => req.status && req.status >= 400);
 
   return (
     <div className="space-y-4">
@@ -32,10 +39,11 @@ function NetworkView({ requests, filter, setFilter }) {
         </select>
         {getIcon(filter)}
       </div>
-      {requests.length === 0 && filter !== 'all' && (
+      {filteredRequests.length === 0 ? (
         <p className="text-text/70">No requests match the selected filter.</p>
+      ) : (
+        <NetworkLog requests={filteredRequests} />
       )}
-      <NetworkLog requests={requests} />
     </div>
   );
 }
