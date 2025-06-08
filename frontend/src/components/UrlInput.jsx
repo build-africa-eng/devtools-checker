@@ -7,17 +7,10 @@ function UrlInput({ setAnalysisData }) {
   const { analyze, loading, error } = useAnalysis();
 
   const handleAnalyze = async () => {
-    if (!url) {
-      console.warn('No URL provided');
-      return;
-    }
-    console.log('Analyzing URL:', url);
+    if (!url) return;
     const data = await analyze(url);
     if (data) {
-      console.log('Analysis result:', data);
       setAnalysisData(data);
-    } else {
-      console.log('Analysis failed, no data returned');
     }
   };
 
@@ -29,9 +22,9 @@ function UrlInput({ setAnalysisData }) {
         onChange={(e) => setUrl(e.target.value)}
         placeholder="Enter website URL"
         className="p-2 rounded bg-gray-800 text-white border border-gray-700 focus:outline-none"
-        required
+        disabled={loading}
       />
-      <AnalyzeButton onAnalyze={handleAnalyze} loading={loading} disabled={!url} />
+      <AnalyzeButton onAnalyze={handleAnalyze} loading={loading} disabled={!url || loading} />
       {error && <p className="text-red-500">{error}</p>}
     </div>
   );
