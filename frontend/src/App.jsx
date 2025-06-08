@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import UrlInput from './components/UrlInput';
 import Tab from './components/Tab';
 import ConsoleView from './pages/ConsoleView';
@@ -7,6 +7,7 @@ import ExportButtons from './components/ExportButtons';
 import FiltersPanel from './components/FiltersPanel';
 import { useAnalysis } from './hooks/useAnalysis';
 import { useFilteredLogs } from './hooks/useFilteredLogs';
+import { Moon, Sun } from 'lucide-react';
 
 function App() {
   const { analyze, loading, error, result } = useAnalysis();
@@ -14,6 +15,9 @@ function App() {
   const [filters, setFilters] = useState({ errors: false, failedRequests: false, warnings: false });
   const [logFilter, setLogFilter] = useState('all');
   const [requestFilter, setRequestFilter] = useState('all');
+  const [isDarkMode, setIsDarkMode] = useState(
+    window.matchMedia('(prefers-color-scheme: dark)').matches
+  );
 
   const analysisData = result || { logs: [], requests: [], warning: null };
   const { filteredLogs, filteredRequests, warning } = useFilteredLogs(analysisData, filters, logFilter, requestFilter);
@@ -29,13 +33,34 @@ function App() {
     setRequestFilter('all');
   };
 
+  const toggleDarkMode = () => {
+    setIsDarkMode((prev) => {
+      const newMode = !prev;
+      document.documentElement.classList.toggle('dark', newMode);
+      return newMode;
+    });
+  };
+
+  useEffect(() => {
+    document.documentElement.classList.toggle('dark', isDarkMode);
+  }, [isDarkMode]);
+
   return (
-    <div className="min-h-screen bg-gray-900 text-white flex flex-col">
+    <div className="min-h-screen bg-background text-text flex flex-col">
+      <div className="p-4 flex justify-between items-center">
+        <h1 className="text-2xl font-bold">DevTools Checker</h1>
+        <button
+          onClick={toggleDarkMode}
+          className="p-2 rounded-full bg-gray-700 hover:bg-gray-600 transition-colors"
+          aria-label={isDarkMode ? 'Switch to light mode' : 'Switch to dark mode'}
+        >
+          {isDarkMode ? <Sun className="w-5 h-5 text-accent" /> : <Moon className="w-5 h-5 text-accent" />}
+        </button>
+      </div>
       <div className="p-4">
-        <h1 className="text-2xl font-bold mb-4">DevTools Checker</h1>
         <UrlInput analyze={analyze} />
-        {error && <p className="text-red-500 mb-4">Error: {error}</p>}
-        {warning && <p className="text-yellow-400 mb-4">Warning: {warning}</p>}
+        {error && <p className="text-error mt-2">Error: {error}</p>}
+        {warning && <p className="text-accent mt-2">Warning: {warning}</p>}
         {hasData && <ExportButtons data={{ logs: filteredLogs, requests: filteredRequests }} />}
       </div>
       <div className="p-4">
