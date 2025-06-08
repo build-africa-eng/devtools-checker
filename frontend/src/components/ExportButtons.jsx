@@ -1,40 +1,53 @@
-function download(content, filename, type) {
-  const blob = new Blob([content], { type });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  a.click();
-  URL.revokeObjectURL(url);
-}
+import React from 'react';
+import { FileDown, FileJson } from 'lucide-react';
 
-export default function ExportButtons({ data }) {
-  const handleExportJSON = () => {
-    const content = JSON.stringify(data, null, 2);
-    download(content, 'analysis.json', 'application/json');
+const ExportButtons = ({ data }) => {
+  const exportJSON = () => {
+    const blob = new Blob([JSON.stringify(data, null, 2)], {
+      type: 'application/json',
+    });
+    const url = URL.createObjectURL(blob);
+    downloadFile(url, 'devtools-export.json');
   };
 
-  const handleExportCSV = () => {
-    const logCSV = data.logs.map(l =>
-      `"${l.type}","${l.text.replace(/"/g, '""')}","${l.location?.url || ''}"`,
-    ).join('\n');
+  const exportCSV = () => {
+    const keys = Object.keys(data[0] || {});
+    const csv = [
+      keys.join(','),
+      ...data.map(row => keys.map(k => JSON.stringify(row[k] ?? '')).join(',')),
+    ].join('\n');
 
-    const requestCSV = data.requests.map(r =>
-      `"${r.method}","${r.status}","${r.url}","${r.resourceType}"`,
-    ).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    downloadFile(url, 'devtools-export.csv');
+  };
 
-    const csvContent = `Console Logs:\nType,Text,Location\n${logCSV}\n\nNetwork Requests:\nMethod,Status,URL,Type\n${requestCSV}`;
-    download(csvContent, 'analysis.csv', 'text/csv');
+  const downloadFile = (url, filename) => {
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    link.click();
+    URL.revokeObjectURL(url);
   };
 
   return (
-    <div className="flex gap-2 my-4">
-      <button onClick={handleExportJSON} className="px-3 py-1 bg-green-600 rounded hover:bg-green-700">
+    <div className="flex gap-4 mt-4">
+      <button
+        onClick={exportJSON}
+        className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-medium rounded-lg transition"
+      >
+        <FileJson className="w-4 h-4" />
         Export JSON
       </button>
-      <button onClick={handleExportCSV} className="px-3 py-1 bg-yellow-600 rounded hover:bg-yellow-700">
+      <button
+        onClick={exportCSV}
+        className="flex items-center gap-2 px-4 py-2 bg-yellow-500 hover:bg-yellow-600 text-black font-medium rounded-lg transition"
+      >
+        <FileDown className="w-4 h-4" />
         Export CSV
       </button>
     </div>
   );
-}
+};
+
+export default ExportButtons;
