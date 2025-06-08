@@ -1,21 +1,22 @@
-@import 'tailwindcss';
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap');
 
 :root {
   --color-background: #ffffff;
-  --color-background-dark: #202124; /* DevTools dark theme */
+  --color-background-dark: #202124;
   --color-text: #333333;
-  --color-primary: #1a73e8;
-  --color-secondary: #34a853;
-  --color-accent: #fbbc04;
-  --color-error: #ea4335;
-  --font-family: 'Inter', sans-serif;
+  --color-text-dark: #e0e0e0;
+  --font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
 }
 
-.dark {
-  --color-background: var(--color-background-dark);
-  --color-text: #e0e0e0;
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-background: var(--color-background-dark);
+    --color-text: var(--color-text-dark);
+  }
 }
 
 body {
@@ -25,16 +26,17 @@ body {
   color: var(--color-text);
 }
 
-/* Layout tweaks for smaller screens */
-@media (max-width: 640px) {
-  button {
-    @apply min-w-[36px] min-h-[36px];
-  }
+/* Focus styles for accessibility */
+button:focus-visible,
+input:focus-visible,
+select:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
 }
 
-/* Accessibility support */
+/* Reduced data/offline optimization */
 @media (prefers-reduced-data: reduce), (offline) {
-  body > div {
+  [data-background-image] {
     background-image: none !important;
     background-color: var(--color-background);
   }
