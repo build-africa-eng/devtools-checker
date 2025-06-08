@@ -1,48 +1,20 @@
+// src/pages/ConsoleView.js
 import React from 'react';
-import { AlertCircle, AlertTriangle, Info, Filter } from 'lucide-react';
-import ConsoleLog from '../components/ConsoleLog';
+import ConsoleLog from '../components/ConsoleLog'; // Make sure path is correct
 
-function ConsoleView({ logs = [], filter = 'all', setFilter }) {
-  console.log('ConsoleView logs:', logs);
-
-  const getIcon = (value) => {
-    switch (value) {
-      case 'error':
-        return <AlertCircle className="w-4 h-4 text-error" />;
-      case 'warning':
-        return <AlertTriangle className="w-4 h-4 text-accent" />;
-      case 'info':
-        return <Info className="w-4 h-4 text-primary" />;
-      default:
-        return <Filter className="w-4 h-4 text-text/70" />;
-    }
-  };
-
-  const filteredLogs =
-    filter === 'all' ? logs : logs.filter((log) => log.level === filter);
+function ConsoleView({ logs = [] }) {
+  if (logs.length === 0) {
+    return (
+      <div className="text-center text-gray-500 dark:text-gray-400 py-8">
+        <p>No console logs to display for the current filters.</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">
-      <h2 className="text-lg font-semibold text-text">Console Logs</h2>
-      <div className="mb-2 flex items-center gap-2">
-        <select
-          value={filter}
-          onChange={(e) => setFilter(e.target.value)}
-          className="bg-background-dark p-1 rounded text-text text-sm border border-gray-700 focus:border-primary"
-          aria-label="Filter console logs"
-        >
-          <option value="all">All</option>
-          <option value="error">Errors</option>
-          <option value="warning">Warnings</option>
-          <option value="info">Info</option>
-        </select>
-        {getIcon(filter)}
-      </div>
-      {filteredLogs.length === 0 ? (
-        <p className="text-text/70">No logs match the selected filter.</p>
-      ) : (
-        <ConsoleLog logs={filteredLogs} />
-      )}
+      <h2 className="text-xl font-semibold">Console Logs</h2>
+      <ConsoleLog logs={logs} />
     </div>
   );
 }
