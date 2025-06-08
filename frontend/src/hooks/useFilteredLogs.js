@@ -4,46 +4,42 @@ export function useFilteredLogs(data, filters, logFilter, requestFilter) {
   const { logs, requests, warning } = data || { logs: [], requests: [], warning: null };
 
   const filteredLogs = useMemo(() => {
-    // Show all logs if no filters are active and logFilter is 'all'
-    if (
-      logFilter === 'all' &&
-      (!filters || (!filters.errors && !filters.warnings))
-    ) {
-      return logs;
-    }
-
     return logs.filter((log) => {
-      // Apply local filter
-      if (logFilter !== 'all' && log.level !== logFilter) {
-        return false;
+      // Normalize log.level to expected values if needed outside hook
+
+      if (logFilter !== 'all') {
+        return log.level === logFilter;
       }
-      // Apply global filters
+
+      // No dropdown filter, use toggles
       if (filters.errors && log.level === 'error') return true;
-      if (filters.warnings && log.level === 'warn') return true;
-      return logFilter === 'all' && !filters.errors && !filters.warnings;
+      if (filters.warnings && log.level === 'warning') return true;
+
+      // If no toggles active, show all
+      if (!filters.errors && !filters.warnings) return true;
+
+      return false;
     });
   }, [logs, filters, logFilter]);
 
   const filteredRequests = useMemo(() => {
-    // Show all requests if no filters are active and requestFilter is 'all'
-    if (
-      requestFilter === 'all' &&
-      (!filters || !filters.failedRequests)
-    ) {
-      return requests;
-    }
-
     return requests.filter((req) => {
-      // Apply local filter
-      if (requestFilter === 'success' && (!req.status || req.status >= 400)) {
-        return false;
+      if (requestFilter !== 'all') {
+        if (requestFilter === 'success') {
+          return req.status && req.status < 400;
+        }
+        if (requestFilter === 'failed') {
+          return req.status && req.status >= 400;
+        }
+        return true;
       }
-      if (requestFilter === 'failed' && (!req.status || req.status < 400)) {
-        return false;
+
+      if (filters.failedRequests) {
+        return req.status && req.status >= 400;
       }
-      // Apply global filters
-      if (filters.failedRequests && req.status && req.status >= 400) return true;
-      return requestFilter === 'all' && !filters.failedRequests;
+
+      // No filters active, show all
+      return true;
     });
   }, [requests, filters, requestFilter]);
 
