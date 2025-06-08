@@ -1,13 +1,16 @@
 import { useState } from 'react';
 
 export function useAnalysis() {
-  const [analysisData, setAnalysisData] = useState({ logs: [], requests: [] });
-  const [isLoading, setIsLoading] = useState(false);
+  const [result, setResult] = useState(null);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
   const analyze = async (url) => {
-    if (!url) return;
-    setIsLoading(true);
+    if (!url) {
+      setError('URL is required');
+      return null;
+    }
+    setLoading(true);
     setError(null);
 
     try {
@@ -24,19 +27,25 @@ export function useAnalysis() {
       const data = await response.json();
       console.log('API Response:', data);
 
-      // Ensure data matches expected format
-      setAnalysisData({
+      if (data.error) {
+        throw new Error(data.error);
+      }
+
+      const formattedData = {
         logs: Array.isArray(data.logs) ? data.logs : [],
         requests: Array.isArray(data.requests) ? data.requests : [],
-      });
+      };
+      setResult(formattedData);
+      return formattedData;
     } catch (err) {
       console.error('Fetch Error:', err.message);
       setError(err.message);
-      setAnalysisData({ logs: [], requests: [] });
+      setResult(null);
+      return null;
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
   };
 
-  return { analysisData, isLoading, error, analyze };
+  return { analyze, loading, error, result };
 }
