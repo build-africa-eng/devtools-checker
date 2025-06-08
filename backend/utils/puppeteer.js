@@ -3,12 +3,7 @@ const puppeteer = require('puppeteer');
 async function analyzeUrl(url) {
   const browser = await puppeteer.launch({
     headless: true,
-    args: [
-      '--no-sandbox',
-      '--disable-setuid-sandbox',
-      '--disable-dev-shm-usage',
-      '--single-process',
-    ],
+    args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--single-process'],
     timeout: 60000,
   });
 
@@ -16,18 +11,12 @@ async function analyzeUrl(url) {
   const logs = [];
   const requests = [];
 
-  // Map console message types to expected levels
-  const typeToLevel = {
-    error: 'error',
-    warning: 'warn',
-    info: 'info',
-    log: 'log',
-  };
+  const typeToLevel = { error: 'error', warning: 'warn', info: 'info', log: 'log' };
 
   page.on('console', (msg) => {
     logs.push({
-      level: typeToLevel[msg.type()] || 'log', // Map type to level
-      message: msg.text(), // Use text as message
+      level: typeToLevel[msg.type()] || 'log',
+      message: msg.text(),
       location: msg.location(),
     });
   });
@@ -37,9 +26,9 @@ async function analyzeUrl(url) {
     requests.push({
       url: req.url(),
       method: req.method(),
-      type: req.resourceType(), // Map resourceType to type
+      type: req.resourceType(),
       status: null,
-      startTime: Date.now(), // Record start time
+      startTime: Date.now(),
     });
     req.continue();
   });
@@ -48,18 +37,17 @@ async function analyzeUrl(url) {
     const req = requests.find((r) => r.url === res.url());
     if (req) {
       req.status = res.status();
-      req.time = Date.now() - req.startTime; // Calculate duration
+      req.time = Date.now() - req.startTime;
     }
   });
 
   try {
-    await page.goto(url, { waitUntil: 'networkidle2', timeout: 60000 });
+    await page.goto(url, { waitUntil: 'networkidle2', timeout: 120000 });
   } catch (error) {
     console.error('Page navigation failed:', error.message);
   }
 
   await browser.close();
-
   return { logs, requests };
 }
 
