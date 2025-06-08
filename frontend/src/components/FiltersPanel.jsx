@@ -1,70 +1,96 @@
+// src/components/FiltersPanel.js
 import React from 'react';
 import { Bug, AlertCircle, WifiOff, Filter, X } from 'lucide-react';
 
-function FiltersPanel({ filters = {}, onToggle, onReset }) {
+function FiltersPanel({
+  toggleFilters = {},
+  logFilter,
+  requestFilter,
+  onToggle,
+  onLogFilterChange,
+  onRequestFilterChange,
+  onReset,
+}) {
+  const hasActiveFilters =
+    toggleFilters.errors ||
+    toggleFilters.warnings ||
+    toggleFilters.failedRequests ||
+    logFilter !== 'all' ||
+    requestFilter !== 'all';
+
   return (
-    <div className="flex flex-wrap gap-3 items-center bg-background-dark p-3 rounded-lg border border-gray-700">
-      <span className="flex items-center gap-2 text-sm text-text/70 font-semibold">
-        <Filter className="w-4 h-4" />
-        Filters:
-      </span>
-
-      <button
-        onClick={() => onToggle('errors')}
-        className={`flex items-center gap-2 px-3 py-1 rounded text-sm font-medium border transition focus:outline-none focus:ring-2
-          ${filters.errors
-            ? 'bg-red-600 text-white border-red-500'
-            : 'bg-gray-700 text-text/70 border-gray-600 hover:bg-red-500/80 hover:text-white'}
-        `}
-        aria-pressed={filters.errors}
-        aria-label="Toggle console errors filter"
-        title="Toggle console errors"
-      >
-        <Bug className={`w-4 h-4 ${filters.errors ? 'text-white' : 'text-red-400'}`} />
-        Console Errors
-      </button>
-
-      <button
-        onClick={() => onToggle('failedRequests')}
-        className={`flex items-center gap-2 px-3 py-1 rounded text-sm font-medium border transition focus:outline-none focus:ring-2
-          ${filters.failedRequests
-            ? 'bg-yellow-600 text-black border-yellow-500'
-            : 'bg-gray-700 text-text/70 border-gray-600 hover:bg-yellow-500/80 hover:text-black'}
-        `}
-        aria-pressed={filters.failedRequests}
-        aria-label="Toggle failed requests filter"
-        title="Toggle failed requests"
-      >
-        <WifiOff className={`w-4 h-4 ${filters.failedRequests ? 'text-black' : 'text-yellow-400'}`} />
-        Failed Requests
-      </button>
-
-      <button
-        onClick={() => onToggle('warnings')}
-        className={`flex items-center gap-2 px-3 py-1 rounded text-sm font-medium border transition focus:outline-none focus:ring-2
-          ${filters.warnings
-            ? 'bg-orange-600 text-white border-orange-500'
-            : 'bg-gray-700 text-text/70 border-gray-600 hover:bg-orange-500 hover:text-white'}
-        `}
-        aria-pressed={filters.warnings}
-        aria-label="Toggle warnings filter"
-        title="Toggle warnings"
-      >
-        <AlertCircle className={`w-4 h-4 ${filters.warnings ? 'text-white' : 'text-orange-400'}`} />
-        Warnings
-      </button>
-
-      {(filters.errors || filters.warnings || filters.failedRequests) && (
+    <div className="flex flex-col sm:flex-row flex-wrap gap-4 items-center bg-gray-200 dark:bg-gray-800 p-3 rounded-lg border border-gray-300 dark:border-gray-700">
+      <div className="flex-grow flex flex-wrap gap-3 items-center">
+        <span className="flex items-center gap-2 text-sm font-semibold">
+          <Filter className="w-4 h-4" />
+          Filters:
+        </span>
+        {/* Toggle Buttons */}
         <button
-          onClick={onReset}
-          className="flex items-center gap-2 px-3 py-1 rounded text-sm font-medium border bg-gray-700 text-text/70 border-gray-600 hover:bg-gray-600 hover:text-white transition focus:outline-none focus:ring-2"
-          aria-label="Clear all filters"
-          title="Clear all filters"
+          onClick={() => onToggle('errors')}
+          className={`flex items-center gap-2 px-3 py-1 rounded-full text-sm font-medium border transition focus:outline-none focus:ring-2 ring-offset-2 dark:ring-offset-gray-800 ${
+            toggleFilters.errors
+              ? 'bg-red-600 text-white border-red-500'
+              : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-400 dark:border-gray-600 hover:bg-red-500/10 hover:border-red-500'
+          }`}
+          aria-pressed={toggleFilters.errors}
         >
-          <X className="w-4 h-4 text-text/70" />
-          Clear All
+          <Bug className="w-4 h-4" />
+          Errors
         </button>
-      )}
+        <button
+          onClick={() => onToggle('warnings')}
+          className={`flex items-center gap-2 px-3 py-1 rounded-full text-sm font-medium border transition focus:outline-none focus:ring-2 ring-offset-2 dark:ring-offset-gray-800 ${
+            toggleFilters.warnings
+              ? 'bg-yellow-500 text-black border-yellow-400'
+              : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-400 dark:border-gray-600 hover:bg-yellow-500/10 hover:border-yellow-500'
+          }`}
+          aria-pressed={toggleFilters.warnings}
+        >
+          <AlertCircle className="w-4 h-4" />
+          Warnings
+        </button>
+        <button
+          onClick={() => onToggle('failedRequests')}
+          className={`flex items-center gap-2 px-3 py-1 rounded-full text-sm font-medium border transition focus:outline-none focus:ring-2 ring-offset-2 dark:ring-offset-gray-800 ${
+            toggleFilters.failedRequests
+              ? 'bg-orange-600 text-white border-orange-500'
+              : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300 border-gray-400 dark:border-gray-600 hover:bg-orange-500/10 hover:border-orange-500'
+          }`}
+          aria-pressed={toggleFilters.failedRequests}
+        >
+          <WifiOff className="w-4 h-4" />
+          Failed Requests
+        </button>
+      </div>
+
+      <div className="flex items-center gap-4">
+        {/* Dropdown Filters */}
+        <div className="flex items-center gap-2">
+           <label htmlFor="log-filter" className="text-sm">Console:</label>
+           <select id="log-filter" value={logFilter} onChange={(e) => onLogFilterChange(e.target.value)} className="bg-white dark:bg-gray-700 p-1 rounded text-sm border border-gray-400 dark:border-gray-600 focus:ring-2">
+             <option value="all">All</option>
+             <option value="error">Errors</option>
+             <option value="warning">Warnings</option>
+             <option value="info">Info</option>
+           </select>
+        </div>
+        <div className="flex items-center gap-2">
+          <label htmlFor="request-filter" className="text-sm">Network:</label>
+           <select id="request-filter" value={requestFilter} onChange={(e) => onRequestFilterChange(e.target.value)} className="bg-white dark:bg-gray-700 p-1 rounded text-sm border border-gray-400 dark:border-gray-600 focus:ring-2">
+             <option value="all">All</option>
+             <option value="success">Success</option>
+             <option value="failed">Failed</option>
+           </select>
+        </div>
+
+        {hasActiveFilters && (
+          <button onClick={onReset} className="flex items-center gap-2 p-2 rounded text-sm font-medium hover:bg-gray-300 dark:hover:bg-gray-600 transition" aria-label="Clear all filters">
+            <X className="w-4 h-4" />
+            Clear
+          </button>
+        )}
+      </div>
     </div>
   );
 }
