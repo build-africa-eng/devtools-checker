@@ -1,12 +1,14 @@
 {
   "name": "devtools-checker-backend",
   "version": "1.0.0",
+  "main": "index.js",
+  "type": "commonjs",
   "scripts": {
+    "postinstall": "PUPPETEER_DOWNLOAD_HOST=https://ipv4.edgedl.me.gvt1.com npx puppeteer browsers install chrome",
     "start": "node index.js"
   },
   "dependencies": {
     "express": "^5.1.0",
-    "cors": "^2.8.5",
     "puppeteer": "^24.10.0"
   }
 }
