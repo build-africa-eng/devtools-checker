@@ -7,8 +7,7 @@ function UrlInput({ setAnalysisData }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const data = await analyze(url);
-    if (data) setAnalysisData(data);
+    await setAnalysisData(url); // Pass URL to handleAnalyze in App
   };
 
   return (
