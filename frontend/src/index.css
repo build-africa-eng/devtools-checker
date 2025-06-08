@@ -4,11 +4,12 @@
 
 :root {
   --color-background: #ffffff;
-  --color-background-dark: #121212;
+  --color-background-dark: #202124; /* Dark theme like DevTools */
   --color-text: #333333;
-  --color-primary: #1db954;
-  --color-secondary: #1ed760;
-  --color-accent: #ff4444;
+  --color-primary: #1a73e8; /* Blue for buttons/links */
+  --color-secondary: #34a853; /* Green for success */
+  --color-accent: #fbbc04; /* Yellow for warnings */
+  --color-error: #ea4335; /* Red for errors */
   --font-family: 'Inter', sans-serif;
 }
 
@@ -22,25 +23,6 @@ body {
   font-family: var(--font-family);
   background-color: var(--color-background);
   color: var(--color-text);
-}
-
-/* Slider customization */
-input[type='range'] {
-  @apply appearance-none h-1 bg-gray-300 rounded-full touch-none;
-}
-
-input[type='range']::-webkit-slider-thumb {
-  @apply appearance-none w-3 h-3 sm:w-4 sm:h-4 bg-primary rounded-full cursor-pointer;
-}
-
-input[type='range']::-moz-range-thumb {
-  @apply w-3 h-3 sm:w-4 sm:h-4 bg-primary rounded-full cursor-pointer;
-}
-
-input[orient='vertical'] {
-  writing-mode: bt-lr;
-  -webkit-appearance: slider-vertical;
-  @apply h-16 sm:h-20 w-1;
 }
 
 /* Layout tweaks for smaller screens */
