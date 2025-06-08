@@ -1,0 +1,40 @@
+function download(content, filename, type) {
+  const blob = new Blob([content], { type });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+export default function ExportButtons({ data }) {
+  const handleExportJSON = () => {
+    const content = JSON.stringify(data, null, 2);
+    download(content, 'analysis.json', 'application/json');
+  };
+
+  const handleExportCSV = () => {
+    const logCSV = data.logs.map(l =>
+      `"${l.type}","${l.text.replace(/"/g, '""')}","${l.location?.url || ''}"`,
+    ).join('\n');
+
+    const requestCSV = data.requests.map(r =>
+      `"${r.method}","${r.status}","${r.url}","${r.resourceType}"`,
+    ).join('\n');
+
+    const csvContent = `Console Logs:\nType,Text,Location\n${logCSV}\n\nNetwork Requests:\nMethod,Status,URL,Type\n${requestCSV}`;
+    download(csvContent, 'analysis.csv', 'text/csv');
+  };
+
+  return (
+    <div className="flex gap-2 my-4">
+      <button onClick={handleExportJSON} className="px-3 py-1 bg-green-600 rounded hover:bg-green-700">
+        Export JSON
+      </button>
+      <button onClick={handleExportCSV} className="px-3 py-1 bg-yellow-600 rounded hover:bg-yellow-700">
+        Export CSV
+      </button>
+    </div>
+  );
+}
