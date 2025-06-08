@@ -2,7 +2,6 @@ import React from 'react';
 import { AlertCircle, AlertTriangle, Info, MessageCircle } from 'lucide-react';
 
 function ConsoleLog({ logs }) {
-  console.log('ConsoleLog logs:', logs);
   if (!logs || logs.length === 0) {
     return <p className="text-gray-400">No console logs found</p>;
   }
@@ -25,15 +24,29 @@ function ConsoleLog({ logs }) {
       {logs.map((log, index) => (
         <div
           key={index}
-          className={`p-2 rounded flex items-start gap-2 ${
-            log.level === 'error' ? 'bg-red-900' :
-            log.level === 'warn' ? 'bg-yellow-900' :
-            log.level === 'info' ? 'bg-blue-900' : 'bg-gray-800'
+          className={`p-2 rounded flex items-start gap-2 border-l-4 ${
+            log.level === 'error'
+              ? 'bg-red-950 border-red-500'
+              : log.level === 'warn'
+              ? 'bg-yellow-950 border-yellow-500'
+              : log.level === 'info'
+              ? 'bg-blue-950 border-blue-500'
+              : 'bg-gray-900 border-gray-600'
           }`}
         >
           {getLogIcon(log.level)}
           <div className="flex-1">
-            <p className="font-mono text-sm">{log.message}</p>
+            <p className="font-mono text-sm break-words whitespace-pre-wrap">
+              {Array.isArray(log.message)
+                ? log.message.map((m, i) => (
+                    <span key={i}>
+                      {typeof m === 'object' ? JSON.stringify(m) : String(m)}{' '}
+                    </span>
+                  ))
+                : typeof log.message === 'object'
+                ? JSON.stringify(log.message)
+                : String(log.message)}
+            </p>
             {log.timestamp && (
               <p className="text-xs text-gray-400">{log.timestamp}</p>
             )}
