@@ -5,6 +5,13 @@ export function useAnalysis() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
+  const friendlyError = (msg) => {
+    if (/timeout/i.test(msg)) return 'Site timed out while loading.';
+    if (/net::ERR/.test(msg)) return 'Network error occurred.';
+    if (/Navigation/.test(msg)) return 'Could not open the page.';
+    return msg;
+  };
+
   const analyze = async (url) => {
     if (!url) {
       setError('URL is required');
@@ -35,24 +42,31 @@ export function useAnalysis() {
       }
 
       const formattedData = {
-        logs: Array.isArray(data.logs) ? data.logs.map(log => ({
-          level: log.level || log.type || 'log',
-          message: log.message || log.text,
-          location: log.location,
-        })) : [],
-        requests: Array.isArray(data.requests) ? data.requests.map(req => ({
-          url: req.url,
-          method: req.method,
-          type: req.resourceType || req.type,
-          status: req.status,
-          time: req.time || 0,
-        })) : [],
+        logs: Array.isArray(data.logs)
+          ? data.logs.map((log) => ({
+              level: log.level || 'log',
+              message: log.message || '',
+              location: log.location || {},
+              timestamp: log.timestamp || '',
+            }))
+          : [],
+        requests: Array.isArray(data.requests)
+          ? data.requests.map((req) => ({
+              url: req.url || '',
+              method: req.method || '',
+              type: req.type || req.resourceType || '',
+              status: req.status ?? null,
+              time: req.time ?? -1,
+            }))
+          : [],
+        warning: data.warning || null,
       };
       setResult(formattedData);
       return formattedData;
     } catch (err) {
+      const userError = friendlyError(err.message);
       console.error('Fetch Error:', err.message);
-      setError(`Analysis failed: ${err.message}`);
+      setError(`Analysis failed: ${userError}`);
       setResult(null);
       return null;
     } finally {
