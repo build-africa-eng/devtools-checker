@@ -1,49 +1,42 @@
-import { useState, useCallback } from 'react';
+import { useState } from 'react';
 
 export function useAnalysis() {
-  const [loading, setLoading] = useState(false);
+  const [analysisData, setAnalysisData] = useState({ logs: [], requests: [] });
+  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [result, setResult] = useState(null);
 
-  const analyze = useCallback(async (url) => {
-    setLoading(true);
+  const analyze = async (url) => {
+    if (!url) return;
+    setIsLoading(true);
     setError(null);
-    setResult(null);
 
-    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000'; // Fallback for local dev
     try {
-      const response = await fetch(`${apiUrl}/analyze`, {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url }),
       });
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || `Failed to analyze URL (${response.status})`);
+        throw new Error(`HTTP error! Status: ${response.status}`);
       }
 
       const data = await response.json();
       console.log('API Response:', data);
 
-      // Ensure compatibility with ConsoleView and NetworkView
-      const processed = {
-        logs: data.logs || [], // Unfiltered logs for all data
-        requests: data.requests || [], // Unfiltered requests for all data
-        importantLogs: data.logs?.filter(log => log.important) || [], // Filtered for importance
-        importantRequests: data.requests?.filter(req => req.important) || [], // Filtered for importance
-      };
-
-      setResult(processed);
-      return processed;
+      // Ensure data matches expected format
+      setAnalysisData({
+        logs: Array.isArray(data.logs) ? data.logs : [],
+        requests: Array.isArray(data.requests) ? data.requests : [],
+      });
     } catch (err) {
-      console.error('Fetch Error:', err);
+      console.error('Fetch Error:', err.message);
       setError(err.message);
-      return null;
+      setAnalysisData({ logs: [], requests: [] });
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
-  }, []);
+  };
 
-  return { analyze, loading, error, result };
+  return { analysisData, isLoading, error, analyze };
 }
