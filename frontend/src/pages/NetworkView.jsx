@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import NetworkLog from '../components/NetworkLog'; // Use NetworkLog instead of NetworkEntry
+import NetworkLog from '../components/NetworkLog';
 
 function NetworkView({ requests, filters }) {
   const [filter, setFilter] = useState('all');
