@@ -2,7 +2,7 @@ import React from 'react';
 import { AlertCircle, AlertTriangle, Info, Filter } from 'lucide-react';
 import ConsoleLog from '../components/ConsoleLog';
 
-function ConsoleView({ logs, filter, setFilter }) {
+function ConsoleView({ logs = [], filter = 'all', setFilter }) {
   console.log('ConsoleView logs:', logs);
 
   const getIcon = (value) => {
@@ -17,6 +17,9 @@ function ConsoleView({ logs, filter, setFilter }) {
         return <Filter className="w-4 h-4 text-text/70" />;
     }
   };
+
+  const filteredLogs =
+    filter === 'all' ? logs : logs.filter((log) => log.level === filter);
 
   return (
     <div className="space-y-4">
@@ -35,10 +38,11 @@ function ConsoleView({ logs, filter, setFilter }) {
         </select>
         {getIcon(filter)}
       </div>
-      {logs.length === 0 && filter !== 'all' && (
+      {filteredLogs.length === 0 ? (
         <p className="text-text/70">No logs match the selected filter.</p>
+      ) : (
+        <ConsoleLog logs={filteredLogs} />
       )}
-      <ConsoleLog logs={logs} />
     </div>
   );
 }
