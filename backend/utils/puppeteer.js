@@ -15,40 +15,52 @@ async function analyzeUrl(url) {
         '--single-process',
         '--no-zygote',
         '--disable-accelerated-2d-canvas',
-        '--disable-web-security', // Bypass CORS issues
+        '--disable-web-security',
       ],
-      timeout: 180000, // Increase to 180s
+      timeout: 180000,
       executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
     });
 
     const page = await browser.newPage();
     const logs = [];
     const requests = [];
+    const MAX_LOGS = 200;
+    const MAX_REQUESTS = 500;
 
     const typeToLevel = { error: 'error', warning: 'warn', info: 'info', log: 'log' };
 
     page.on('console', (msg) => {
-      logs.push({
-        level: typeToLevel[msg.type()] || 'log',
-        message: msg.text(),
-        location: msg.location(),
-      });
+      if (logs.length < MAX_LOGS) {
+        logs.push({
+          level: typeToLevel[msg.type()] || 'log',
+          message: msg.text(),
+          location: msg.location(),
+          timestamp: new Date().toISOString(),
+        });
+      }
     });
 
-    await page.setRequestInterception(true);
+    try {
+      await page.setRequestInterception(true);
+    } catch (err) {
+      console.warn('Failed to set request interception:', err.message);
+    }
+
     page.on('request', (req) => {
-      requests.push({
-        url: req.url(),
-        method: req.method(),
-        type: req.resourceType(),
-        status: null,
-        startTime: Date.now(),
-      });
+      if (requests.length < MAX_REQUESTS) {
+        requests.push({
+          url: req.url(),
+          method: req.method(),
+          type: req.resourceType(),
+          status: null,
+          startTime: Date.now(),
+        });
+      }
       req.continue();
     });
 
     page.on('response', (res) => {
-      const req = requests.find((r) => r.url === res.url());
+      const req = [...requests].reverse().find((r) => r.url === res.url() && r.status === null);
       if (req) {
         req.status = res.status();
         req.time = Date.now() - req.startTime;
@@ -56,12 +68,20 @@ async function analyzeUrl(url) {
     });
 
     try {
-      await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 }); // 60s
+      await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
     } catch (error) {
       console.error('Page navigation failed:', error.message);
     }
 
-    return { logs, requests };
+    requests.forEach((r) => {
+      if (!('time' in r)) r.time = -1;
+    });
+
+    return {
+      logs: logs.slice(0, MAX_LOGS),
+      requests: requests.slice(0, MAX_REQUESTS),
+      warning: logs.length >= MAX_LOGS || requests.length >= MAX_REQUESTS ? 'Data truncated due to high volume' : undefined,
+    };
   } catch (error) {
     console.error('Puppeteer error:', error.message);
     return { logs: [], requests: [], error: error.message };
