@@ -8,7 +8,7 @@ const AnalyzeButton = ({ onAnalyze, loading, disabled = false }) => {
       type="button"
       onClick={onAnalyze}
       disabled={loading || disabled}
-      className="flex items-center gap-2 p-2 bg-blue-600 rounded disabled:opacity-50 hover:bg-blue-700 transition text-white"
+      className="flex items-center gap-2 p-2 bg-primary rounded disabled:opacity-50 hover:bg-primary/90 transition-colors text-white min-w-button min-h-button"
       aria-label={loading ? 'Analyzing in progress' : 'Analyze website'}
       aria-busy={loading}
     >
