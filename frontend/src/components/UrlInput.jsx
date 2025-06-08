@@ -1,14 +1,31 @@
-import { useState } from 'react';
-import { useAnalysis } from '../hooks/useAnalysis';
+import React, { useState } from 'react';
 import AnalyzeButton from './AnalyzeButton';
 
-function UrlInput({ setAnalysisData }) {
+function UrlInput({ analyze }) {
   const [url, setUrl] = useState('');
+  const [localError, setLocalError] = useState(null);
   const { loading, error } = useAnalysis();
 
+  const isValidUrl = (str) => {
+    try {
+      new URL(str);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
   const handleAnalyze = async () => {
-    if (!url) return;
-    const data = await setAnalysisData(url);
+    if (!url) {
+      setLocalError('URL is required');
+      return;
+    }
+    if (!isValidUrl(url)) {
+      setLocalError('Please enter a valid URL');
+      return;
+    }
+    setLocalError(null);
+    const data = await analyze(url);
     if (!data) {
       console.log('Analysis failed, no data returned');
     }
@@ -20,12 +37,18 @@ function UrlInput({ setAnalysisData }) {
         type="url"
         value={url}
         onChange={(e) => setUrl(e.target.value)}
-        placeholder="Enter website URL"
-        className="p-2 rounded bg-gray-800 text-white border border-gray-700 focus:outline-none"
+        placeholder="Enter website URL (e.g., https://example.com)"
+        className="p-2 rounded bg-gray-800 text-white border border-gray-700 focus:outline-none focus:border-blue-500"
         disabled={loading}
+        aria-label="Website URL input"
+        aria-describedby={error || localError ? 'url-error' : undefined}
       />
       <AnalyzeButton onAnalyze={handleAnalyze} loading={loading} disabled={!url || loading} />
-      {error && <p className="text-red-500">{error}</p>}
+      {(error || localError) && (
+        <p id="url-error" className="text-red-500 text-sm">
+          {error || localError}
+        </p>
+      )}
     </div>
   );
 }
