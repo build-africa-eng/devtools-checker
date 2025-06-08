@@ -23,7 +23,7 @@ export function useAnalysis() {
 
     try {
       const apiUrl = `${import.meta.env.VITE_API_URL}/analyze`;
-      console.log('Fetching from:', apiUrl);
+      console.log('🔍 Fetching from:', apiUrl);
 
       const response = await fetch(apiUrl, {
         method: 'POST',
@@ -37,10 +37,18 @@ export function useAnalysis() {
       }
 
       const { data } = await response.json();
-      console.log('API Response:', data);
+      console.log('✅ API Raw Response:', data);
 
       if (data.error) {
         throw new Error(data.message || data.error);
+      }
+
+      // Warn if expected data keys are missing or malformed
+      if (!Array.isArray(data.logs)) {
+        console.warn('⚠️ "logs" is missing or not an array:', data.logs);
+      }
+      if (!Array.isArray(data.requests)) {
+        console.warn('⚠️ "requests" is missing or not an array:', data.requests);
       }
 
       const formattedData = {
@@ -68,7 +76,7 @@ export function useAnalysis() {
       return formattedData;
     } catch (err) {
       const userError = friendlyError(err.message);
-      console.error('Fetch Error:', err.message);
+      console.error('❌ Fetch Error:', err.message);
       setError(`Analysis failed: ${userError}`);
       setResult(null);
       return null;
