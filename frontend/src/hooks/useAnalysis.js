@@ -1,85 +1,88 @@
 import { useState } from 'react';
 
+/**
+ * A custom React hook to analyze a URL using the backend API.
+ * Handles loading, result, and error states.
+ *
+ * @returns {{
+ *   analyze: (url: string, options?: { includeHtml?: boolean, includeScreenshot?: boolean }) => Promise<object|null>,
+ *   loading: boolean,
+ *   error: string|null,
+ *   result: object|null
+ * }}
+ */
 export function useAnalysis() {
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  const friendlyError = (msg) => {
-    if (msg.includes('timeout')) return 'Site timed out while loading.';
-    if (msg.includes('net::ERR')) return 'Network error occurred.';
-    if (msg.includes('Navigation')) return 'Failed to load the page.';
-    return msg;
+  /**
+   * Translates internal errors to user-friendly messages.
+   * @param {string} msg
+   * @returns {string}
+   */
+  const friendlyError = (msg = '') => {
+    const lowered = msg.toLowerCase();
+    if (lowered.includes('failed to fetch')) return 'Cannot connect to the analysis server. Please check your connection or try again later.';
+    if (lowered.includes('timeout')) return 'The website took too long to load and timed out.';
+    if (lowered.includes('net::err')) return 'A network error occurred while trying to reach the website.';
+    if (lowered.includes('navigation')) return 'Failed to navigate to the page during analysis.';
+    return msg || 'An unknown error occurred.';
   };
 
-  const analyze = async (url) => {
-    if (!url) {
-      setError('URL is required');
+  /**
+   * Sends a URL to the backend for analysis.
+   * @param {string} url
+   * @param {object} [options]
+   * @returns {Promise<object|null>}
+   */
+  const analyze = async (url, options = {}) => {
+    if (!url || typeof url !== 'string') {
+      setError('A valid URL is required.');
       return null;
     }
 
     setLoading(true);
     setError(null);
+    setResult(null);
 
     try {
       const apiUrl = `${import.meta.env.VITE_API_URL}/analyze`;
-      console.log('🔍 Fetching from:', apiUrl);
 
       const response = await fetch(apiUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url }),
+        body: JSON.stringify({ url, options }),
       });
 
+      const data = await response.json();
+
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.message || `HTTP error! Status: ${response.status}`);
+        throw new Error(data?.message || `HTTP error: ${response.status}`);
       }
 
-      const { data } = await response.json();
-      console.log('✅ API Raw Response:', data);
-
-      if (data.error) {
-        throw new Error(data.message || data.error);
+      if (data?.error) {
+        throw new Error(data.error);
       }
 
-      // Warn if expected data keys are missing or malformed
-      if (!Array.isArray(data.logs)) {
-        console.warn('⚠️ "logs" is missing or not an array:', data.logs);
-      }
-      if (!Array.isArray(data.requests)) {
-        console.warn('⚠️ "requests" is missing or not an array:', data.requests);
-      }
-
-      const formattedData = {
-        logs: Array.isArray(data.logs)
-          ? data.logs.map((log) => ({
-              level: log.level || 'log',
-              message: log.message || '',
-              location: log.location || {},
-              timestamp: log.timestamp || '',
-            }))
-          : [],
-        requests: Array.isArray(data.requests)
-          ? data.requests.map((req) => ({
-              url: req.url,
-              method: req.method || '',
-              type: req.type || req.resourceType || '',
-              status: req.status ?? null,
-              time: req.time ?? -1,
-            }))
-          : [],
+      const formatted = {
+        title: data.title || 'Untitled Page',
+        html: data.html,
+        screenshot: data.screenshot,
+        logs: Array.isArray(data.logs) ? data.logs : [],
+        requests: Array.isArray(data.requests) ? data.requests : [],
         warning: data.warning || null,
       };
 
-      setResult(formattedData);
-      return formattedData;
+      setResult(formatted);
+      return formatted;
+
     } catch (err) {
-      const userError = friendlyError(err.message);
-      console.error('❌ Fetch Error:', err.message);
-      setError(`Analysis failed: ${userError}`);
+      const userMessage = friendlyError(err.message);
+      setError(userMessage);
       setResult(null);
       return null;
+
     } finally {
       setLoading(false);
     }
