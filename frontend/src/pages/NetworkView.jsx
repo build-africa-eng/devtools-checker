@@ -22,7 +22,7 @@ function NetworkView({ requests, filters }) {
         {filteredRequests.length === 0 ? (
           <p className="text-gray-500 text-center">No requests available</p>
         ) : (
-          filteredRequests.map((req, index) => <NetworkLog key={index} requests={[req]} />)
+          <NetworkLog requests={filteredRequests} />
         )}
       </div>
     </>
