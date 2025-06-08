@@ -8,12 +8,14 @@ const AnalyzeButton = ({ onAnalyze, loading, disabled = false }) => {
       type="button"
       onClick={onAnalyze}
       disabled={loading || disabled}
-      className="flex items-center gap-2 p-2 bg-primary rounded disabled:opacity-50 hover:bg-primary/90 transition-colors text-white min-w-button min-h-button"
+      className={`flex items-center gap-2 p-2 bg-primary text-white rounded min-w-button min-h-button transition-colors ${
+        loading || disabled ? 'opacity-50 cursor-not-allowed' : 'hover:bg-primary/90'
+      }`}
       aria-label={loading ? 'Analyzing in progress' : 'Analyze website'}
       aria-busy={loading}
     >
-      <Play className="w-4 h-4" />
-      {loading ? 'Analyzing...' : 'Analyze'}
+      <Play className="w-4 h-4 shrink-0" />
+      <span>{loading ? 'Analyzing...' : 'Analyze'}</span>
     </button>
   );
 };
