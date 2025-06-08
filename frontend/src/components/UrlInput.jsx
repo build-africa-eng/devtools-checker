@@ -4,13 +4,13 @@ import AnalyzeButton from './AnalyzeButton';
 
 function UrlInput({ setAnalysisData }) {
   const [url, setUrl] = useState('');
-  const { analyze, loading, error } = useAnalysis();
+  const { loading, error } = useAnalysis();
 
   const handleAnalyze = async () => {
     if (!url) return;
-    const data = await analyze(url);
-    if (data) {
-      setAnalysisData(data);
+    const data = await setAnalysisData(url);
+    if (!data) {
+      console.log('Analysis failed, no data returned');
     }
   };
 
