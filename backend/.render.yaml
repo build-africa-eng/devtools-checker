@@ -1,16 +1,11 @@
 services:
   - type: web
-    name: devtools-checker
+    name: my-backend
     env: node
-    plan: free
-    region: oregon
-    buildCommand: npm install && npx playwright install chromium
-    startCommand: node index.js
-    envVars:
-      - key: PORT
-        value: 5000
-      - key: NODE_ENV
-        value: production
+    repo: https://github.com/build-africa-eng/devtools-checker
+    branch: main
+    buildCommand: npm install
+    startCommand: npm start
     preDeployCommand: |
       apt-get update
       apt-get install -y --no-install-recommends \
@@ -37,3 +32,6 @@ services:
         libappindicator3-1 \
         libfontconfig1 \
         wget
+    envVars:
+      - key: NODE_VERSION
+        value: 22.16.0
