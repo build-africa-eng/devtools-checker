@@ -8,22 +8,22 @@ function NetworkView({ requests, filter, setFilter }) {
   const getIcon = (value) => {
     switch (value) {
       case 'success':
-        return <CheckCircle className="w-4 h-4 text-green-500" />;
+        return <CheckCircle className="w-4 h-4 text-secondary" />;
       case 'failed':
-        return <XCircle className="w-4 h-4 text-red-500" />;
+        return <XCircle className="w-4 h-4 text-error" />;
       default:
-        return <Filter className="w-4 h-4 text-gray-300" />;
+        return <Filter className="w-4 h-4 text-text/70" />;
     }
   };
 
   return (
     <div className="space-y-4">
-      <h2 className="text-lg font-semibold">Network Requests</h2>
+      <h2 className="text-lg font-semibold text-text">Network Requests</h2>
       <div className="mb-2 flex items-center gap-2">
         <select
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
-          className="bg-gray-800 p-1 rounded text-white text-sm"
+          className="bg-background-dark p-1 rounded text-text text-sm border border-gray-700 focus:border-primary"
           aria-label="Filter network requests"
         >
           <option value="all">All</option>
@@ -33,7 +33,7 @@ function NetworkView({ requests, filter, setFilter }) {
         {getIcon(filter)}
       </div>
       {requests.length === 0 && filter !== 'all' && (
-        <p className="text-gray-400">No requests match the selected filter.</p>
+        <p className="text-text/70">No requests match the selected filter.</p>
       )}
       <NetworkLog requests={requests} />
     </div>
