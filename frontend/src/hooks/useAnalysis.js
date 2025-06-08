@@ -1,17 +1,18 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 
 export function useAnalysis() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [result, setResult] = useState(null);
 
-  const analyze = async (url) => {
+  const analyze = useCallback(async (url) => {
     setLoading(true);
     setError(null);
     setResult(null);
 
+    const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000'; // Fallback for local dev
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/analyze`, {
+      const response = await fetch(`${apiUrl}/analyze`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url }),
@@ -23,27 +24,26 @@ export function useAnalysis() {
       }
 
       const data = await response.json();
-      console.log('API Success:', data);
+      console.log('API Response:', data);
 
-      const importantLogs = data.logs.filter(log => log.important);
-      const importantRequests = data.requests.filter(req => req.important);
-
+      // Ensure compatibility with ConsoleView and NetworkView
       const processed = {
-        ...data,
-        importantLogs,
-        importantRequests,
+        logs: data.logs || [], // Unfiltered logs for all data
+        requests: data.requests || [], // Unfiltered requests for all data
+        importantLogs: data.logs?.filter(log => log.important) || [], // Filtered for importance
+        importantRequests: data.requests?.filter(req => req.important) || [], // Filtered for importance
       };
 
       setResult(processed);
-      setLoading(false);
       return processed;
     } catch (err) {
       console.error('Fetch Error:', err);
       setError(err.message);
-      setLoading(false);
       return null;
+    } finally {
+      setLoading(false);
     }
-  };
+  }, []);
 
   return { analyze, loading, error, result };
 }
