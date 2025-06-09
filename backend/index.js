@@ -14,16 +14,16 @@ app.use(cors(corsOptions));
 app.use(express.json());
 
 // Routes
-app.use('/analyze', analyzeRouter);
+app.use('/api/analyze', analyzeRouter); // Changed from '/analyze' to '/api/analyze'
 
 // Root GET route for clarity
 app.get('/', (req, res) => {
-  res.json({ message: 'DevTools Checker Backend - Use POST /analyze to analyze URLs' });
+  res.json({ message: 'DevTools Checker Backend - Use POST /api/analyze to analyze URLs' });
 });
 
-// GET /analyze route for clarity
-app.get('/analyze', (req, res) => {
-  res.json({ message: 'Use POST /analyze with a JSON body { "url": "https://example.com" } to analyze a URL' });
+// GET /api/analyze route for clarity
+app.get('/api/analyze', (req, res) => {
+  res.json({ message: 'Use POST /api/analyze with a JSON body { "url": "https://example.com" } to analyze a URL' });
 });
 
 const PORT = process.env.PORT || 5000;
