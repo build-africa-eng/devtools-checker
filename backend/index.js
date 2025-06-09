@@ -4,10 +4,7 @@ const analyzeRouter = require('./routes/analyze');
 
 const app = express();
 
-// Trust proxy for Render
-app.set('trust proxy', true);
-
-// Configure CORS based on environment
+app.set('trust proxy', 1); // Trust Render's first proxy
 const corsOptions = {
   origin: process.env.NODE_ENV === 'production' 
     ? 'https://devtools-checker.pages.dev' 
@@ -16,15 +13,12 @@ const corsOptions = {
 app.use(cors(corsOptions));
 app.use(express.json());
 
-// Routes
 app.use('/api/analyze', analyzeRouter);
 
-// Root GET route for clarity
 app.get('/', (req, res) => {
   res.json({ message: 'DevTools Checker Backend - Use POST /api/analyze to analyze URLs' });
 });
 
-// GET /api/analyze route for clarity
 app.get('/api/analyze', (req, res) => {
   res.json({ message: 'Use POST /api/analyze with a JSON body { "url": "https://example.com" } to analyze a URL' });
 });
