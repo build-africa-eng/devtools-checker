@@ -1,15 +1,20 @@
 const express = require('express');
 const cors = require('cors');
-const analyzeRouter = require('./routes/analyze'); // Updated variable name
+const analyzeRouter = require('./routes/analyze');
 
 const app = express();
 
-// Configure CORS for Cloudflare Pages frontend
-app.use(cors({ origin: 'https://devtools-checker.pages.dev' }));
+// Configure CORS based on environment
+const corsOptions = {
+  origin: process.env.NODE_ENV === 'production' 
+    ? 'https://devtools-checker.pages.dev' 
+    : 'http://localhost:5173', // Default Vite dev server port
+};
+app.use(cors(corsOptions));
 app.use(express.json());
 
 // Routes
-app.use('/analyze', analyzeRouter); // Use updated variable
+app.use('/analyze', analyzeRouter);
 
 // Root GET route for clarity
 app.get('/', (req, res) => {
