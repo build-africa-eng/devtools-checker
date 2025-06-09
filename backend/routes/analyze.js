@@ -1,7 +1,7 @@
 const express = require('express');
+const { analyzeUrl } = require('../utils/puppeteer');
 const router = express.Router();
 const rateLimit = require('express-rate-limit');
-const { analyzeUrl } = require('../utils/puppeteer');
 const isValidUrl = require('../utils/isValidUrl');
 const logger = require('../utils/logger');
 
@@ -27,9 +27,9 @@ router.post('/', limiter, async (req, res) => {
 
   try {
     logger.info(`Analysis started: ${url} from ${ip} | Options: ${JSON.stringify(options)}`);
-    
+
     const analysisData = await analyzeUrl(url, options);
-    
+
     if (analysisData.error) {
       logger.error(`Analysis failed: ${url} | ${analysisData.error}`);
       return res.status(500).json({ 
@@ -41,7 +41,6 @@ router.post('/', limiter, async (req, res) => {
 
     logger.info(`Analysis completed: ${url} for ${ip}`);
     return res.json(analysisData);
-
   } catch (error) {
     logger.error(`Unexpected error: ${url} | ${error.stack || error.message}`);
     return res.status(500).json({ 
