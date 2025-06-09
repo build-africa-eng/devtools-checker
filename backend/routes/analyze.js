@@ -6,8 +6,8 @@ const isValidUrl = require('../utils/isValidUrl');
 const logger = require('../utils/logger');
 
 const limiter = rateLimit({
-  windowMs: 1 * 60 * 1000,
-  max: 10,
+  windowMs: 1 * 60 * 1000, // 1 minute
+  max: 10, // 10 requests per IP
   message: 'Too many requests. Please try again later.',
 });
 
