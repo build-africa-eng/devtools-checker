@@ -1,6 +1,6 @@
 // src/pages/ConsoleView.js
 import React from 'react';
-import ConsoleLog from '../components/ConsoleLog'; // Make sure path is correct
+import ConsoleLog from '../components/ConsoleLog';
 
 function ConsoleView({ logs = [] }) {
   if (logs.length === 0) {
@@ -12,10 +12,10 @@ function ConsoleView({ logs = [] }) {
   }
 
   return (
-    <div className="space-y-4">
+    <section className="space-y-4">
       <h2 className="text-xl font-semibold">Console Logs</h2>
       <ConsoleLog logs={logs} />
-    </div>
+    </section>
   );
 }
 
