@@ -12,13 +12,12 @@ function UrlInput({ onAnalyze, loading, globalError }) {
       return;
     }
 
-    // Basic validation for a more user-friendly experience
-    let finalUrl = url;
-    if (!/^https?:\/\//i.test(url)) {
-      finalUrl = `https://${url}`;
+    // Normalize URL: add https:// if missing
+    let finalUrl = url.trim();
+    if (!/^https?:\/\//i.test(finalUrl)) {
+      finalUrl = `https://${finalUrl}`;
     }
 
-    // Reset local error before new analysis
     setLocalError('');
     onAnalyze(finalUrl);
   };
@@ -31,24 +30,32 @@ function UrlInput({ onAnalyze, loading, globalError }) {
           handleAnalyzeClick();
         }}
         className="flex flex-col sm:flex-row gap-2"
+        noValidate
       >
         <input
-          type="text" // Use text to allow URLs without http prefix
+          type="text"
           value={url}
           onChange={(e) => setUrl(e.target.value)}
           placeholder="example.com"
           className={`flex-grow p-2 rounded bg-white dark:bg-gray-800 text-gray-800 dark:text-white border ${
-            globalError || localError ? 'border-red-500' : 'border-gray-500'
+            (globalError || localError) ? 'border-red-500' : 'border-gray-500'
           } focus:outline-none focus:ring-2 focus:ring-blue-500`}
           disabled={loading}
           aria-label="Website URL input"
           aria-invalid={!!(globalError || localError)}
           aria-describedby="url-error"
+          spellCheck={false}
+          autoComplete="off"
         />
-        <AnalyzeButton onAnalyze={handleAnalyzeClick} loading={loading} disabled={!url || loading} />
+        <AnalyzeButton
+          onAnalyze={handleAnalyzeClick}
+          loading={loading}
+          disabled={!url.trim() || loading}
+          aria-label="Analyze website"
+        />
       </form>
       {(globalError || localError) && (
-        <p id="url-error" className="text-red-500 text-sm mt-1">
+        <p id="url-error" className="text-red-500 text-sm mt-1" role="alert">
           {globalError || localError}
         </p>
       )}
