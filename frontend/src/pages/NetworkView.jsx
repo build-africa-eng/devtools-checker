@@ -1,6 +1,6 @@
 // src/pages/NetworkView.js
 import React from 'react';
-import NetworkLog from '../components/NetworkLog'; // Make sure path is correct
+import NetworkLog from '../components/NetworkLog';
 
 function NetworkView({ requests = [] }) {
   if (requests.length === 0) {
@@ -12,10 +12,10 @@ function NetworkView({ requests = [] }) {
   }
 
   return (
-    <div className="space-y-4">
+    <section className="space-y-4">
       <h2 className="text-xl font-semibold">Network Requests</h2>
       <NetworkLog requests={requests} />
-    </div>
+    </section>
   );
 }
 
