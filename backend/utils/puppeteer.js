@@ -33,6 +33,7 @@ async function analyzeUrl(url, options = {}) {
       headless: 'new',
       args: launchArgs,
       timeout: 180000, // 3-minute timeout for browser launch
+      protocolTimeout: 60000, // 1-minute protocol timeout
       executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
     });
 
@@ -41,7 +42,6 @@ async function analyzeUrl(url, options = {}) {
 
     const logs = [];
     const requests = [];
-    // Use a Map for O(1) lookups to match responses to requests, which is much faster.
     const requestMap = new Map();
     const MAX_LOGS = 200;
     const MAX_REQUESTS = 500;
@@ -62,7 +62,6 @@ async function analyzeUrl(url, options = {}) {
 
     page.on('request', (req) => {
       const resourceType = req.resourceType();
-      // Abort non-essential resources to significantly speed up analysis
       if (['image', 'media', 'font', 'stylesheet'].includes(resourceType)) {
         return req.abort();
       }
@@ -72,25 +71,24 @@ async function analyzeUrl(url, options = {}) {
           url: req.url(),
           method: req.method(),
           type: resourceType,
-          status: null, // To be filled by the 'response' event
-          time: -1, // To be calculated on response
+          status: null,
+          time: -1,
           startTime: process.hrtime.bigint(),
         };
         requests.push(requestData);
-        // Map the request object to its URL for quick lookup later
         requestMap.set(req.id, requestData);
       }
       req.continue().catch(() => {});
     });
 
     page.on('response', async (res) => {
-      // Find the corresponding request in our map
       const requestData = requestMap.get(res.request().id);
       if (requestData) {
         requestData.status = res.status();
         const endTime = process.hrtime.bigint();
-        // Calculate duration in milliseconds with high precision
-        requestData.time = Number(endTime - requestData.startTime) / 1e6;
+        // Explicitly handle BigInt to avoid serialization issues
+        const timeDiff = Number(endTime - requestData.startTime); // Convert BigInt difference to number
+        requestData.time = timeDiff / 1e6; // Convert to milliseconds
       }
     });
 
@@ -102,8 +100,8 @@ async function analyzeUrl(url, options = {}) {
     await page.setViewport({ width: 1366, height: 768 });
 
     await page.goto(url, {
-      waitUntil: 'networkidle2', // Wait until the network is quiet
-      timeout: 60000, // 1-minute timeout for page navigation
+      waitUntil: 'networkidle2',
+      timeout: 60000,
     });
 
     const pageTitle = await page.title();
@@ -122,7 +120,6 @@ async function analyzeUrl(url, options = {}) {
           : undefined,
     };
   } catch (error) {
-    // Provide more specific, user-friendly error messages
     let errorMessage = 'Unable to process the page. The target website may be down or blocking automated tools.';
     if (error.name === 'TimeoutError') {
       errorMessage = `Navigation Timeout: The website took too long to load or respond.`;
@@ -130,11 +127,11 @@ async function analyzeUrl(url, options = {}) {
     console.error(`Puppeteer error for ${url}:`, error.message);
     return {
       error: errorMessage,
-      details: error.message, // Keep technical details for debugging
+      details: error.message,
     };
   } finally {
     if (browser) {
-      await browser.close().catch(e => console.error(`Failed to close browser: ${e.message}`));
+      await browser.close().catch((e) => console.error(`Failed to close browser: ${e.message}`));
     }
   }
 }
