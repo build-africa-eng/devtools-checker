@@ -12,8 +12,8 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: '18'
-      - name: Install root dependencies
+          node-version: '22'
+      - name: Install frontend dependencies
         run: npm install
       - name: Install frontend dependencies
         run: cd frontend && npm install
