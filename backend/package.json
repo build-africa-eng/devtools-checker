@@ -12,6 +12,7 @@
     "puppeteer-extra": "^3.3.6",
     "puppeteer-extra-plugin-adblocker": "^2.13.6",
     "winston": "^3.17.0",
+    "lighthouse: "12.6.1",
     "express-rate-limit": "^7.5.0",
     "puppeteer-extra-plugin-stealth": "^2.11.2",
     "cors": "^2.8.5",
