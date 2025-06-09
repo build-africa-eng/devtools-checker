@@ -10,6 +10,8 @@
   "dependencies": {
     "express": "^5.1.0",
     "puppeteer-extra": "^3.3.6",
+    "nodes-cache": "^5.1.2",
+    "@axe-core/puppeteer": "^4.10.2",
     "puppeteer-extra-plugin-adblocker": "^2.13.6",
     "winston": "^3.17.0",
     "lighthouse": "12.6.1",
