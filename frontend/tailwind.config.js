@@ -3,7 +3,7 @@ const plugin = require('tailwindcss/plugin');
 
 module.exports = {
   content: ['./src/**/*.{js,jsx,ts,tsx}'],
-  darkMode: 'class', // Optional: switch between dark/light using 'class'
+  darkMode: 'class',
   theme: {
     extend: {
       colors: {
@@ -33,15 +33,14 @@ module.exports = {
         '7': '1.75rem',
       },
     },
-  },
-  screens: {
-    sm: '640px',
+    screens: {
+      sm: '640px',
+    },
   },
   plugins: [
-    require('@tailwindcss/forms'),       // Better form controls
-    require('@tailwindcss/typography'),  // Prose content (blog, docs)
-    require('@tailwindcss/aspect-ratio'),// Maintain video/image ratios
-    // Optional custom plugin: adds `.bg-stripes` utility
+    require('@tailwindcss/forms'),
+    require('@tailwindcss/typography'),
+    require('@tailwindcss/aspect-ratio'),
     plugin(function ({ addUtilities }) {
       addUtilities({
         '.bg-stripes': {
@@ -52,7 +51,4 @@ module.exports = {
       });
     }),
   ],
-  future: {
-    hoverOnlyWhenSupported: true,
-  },
 };
