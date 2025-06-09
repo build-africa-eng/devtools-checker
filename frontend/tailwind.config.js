@@ -1,16 +1,28 @@
 /** @type {import('tailwindcss').Config} */
-module.exports = {
-  content: ['./src/**/*.{js,jsx,ts,tsx}'],
+export default {
+  content: [
+    "index.html",
+    "./src/**/*.{js,ts,jsx,tsx}",
+  ],
   theme: {
     extend: {
       colors: {
-        primary: '#1db954', // A Spotify-like green for accents
-        secondary: '#1ed760', // Lighter green for hover states
-        background: '#ffffff', // Light mode background
-        'background-dark': '#121212', // Dark mode background
+        brand: {
+          DEFAULT: "#1E40AF",
+          light: "#3B82F6",
+          dark: "#1E3A8A",
+        },
+      },
+      fontFamily: {
+        sans: ['Inter', 'ui-sans-serif', 'system-ui'],
+        mono: ['Fira Code', 'ui-monospace', 'SFMono-Regular'],
       },
     },
   },
-  plugins: [],
-  darkMode: 'class', // Enables dark mode via class toggle
+  darkMode: 'class', // or 'media'
+  plugins: [
+    require('@tailwindcss/forms'),
+    require('@tailwindcss/typography'),
+    require('@tailwindcss/aspect-ratio'),
+  ],
 };
