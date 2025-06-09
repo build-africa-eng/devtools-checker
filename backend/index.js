@@ -1,6 +1,6 @@
 const express = require('express');
 const cors = require('cors');
-const analyzeRoute = require('./routes/analyze');
+const analyzeRouter = require('./routes/analyze'); // Updated variable name
 
 const app = express();
 
@@ -9,7 +9,7 @@ app.use(cors({ origin: 'https://devtools-checker.pages.dev' }));
 app.use(express.json());
 
 // Routes
-app.use('/analyze', analyzeRoute);
+app.use('/analyze', analyzeRouter); // Use updated variable
 
 // Root GET route for clarity
 app.get('/', (req, res) => {
