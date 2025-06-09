@@ -8,8 +8,10 @@ const AnalyzeButton = ({ onAnalyze, loading, disabled = false }) => {
       type="button"
       onClick={onAnalyze}
       disabled={loading || disabled}
-      className={`flex items-center gap-2 p-2 bg-primary text-white rounded min-w-button min-h-button transition-colors ${
-        loading || disabled ? 'opacity-50 cursor-not-allowed' : 'hover:bg-primary/90'
+      className={`flex items-center gap-2 px-4 py-2 rounded min-w-[120px] min-h-[40px] font-medium transition-colors ${
+        loading || disabled
+          ? 'bg-primary text-white opacity-50 cursor-not-allowed'
+          : 'bg-primary text-white hover:bg-primary/90'
       }`}
       aria-label={loading ? 'Analyzing in progress' : 'Analyze website'}
       aria-busy={loading}
@@ -26,4 +28,4 @@ AnalyzeButton.propTypes = {
   disabled: PropTypes.bool,
 };
 
-export default AnalyzeButton;
+export default React.memo(AnalyzeButton);
