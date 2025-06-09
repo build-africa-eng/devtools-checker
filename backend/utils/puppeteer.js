@@ -2,9 +2,11 @@ const puppeteer = require('puppeteer-extra');
 const StealthPlugin = require('puppeteer-extra-plugin-stealth');
 const AdblockerPlugin = require('puppeteer-extra-plugin-adblocker');
 
+// Plugins for stealth and ad/tracker blocking
 puppeteer.use(StealthPlugin());
 puppeteer.use(AdblockerPlugin({ blockTrackers: true }));
 
+// Recommended stability flags for cloud/CI environments
 const launchArgs = [
   '--no-sandbox',
   '--disable-setuid-sandbox',
@@ -14,6 +16,18 @@ const launchArgs = [
   '--no-zygote',
   '--single-process',
   '--disable-gpu',
+  // Additional flags for even more stability
+  '--disable-background-networking',
+  '--disable-background-timer-throttling',
+  '--disable-client-side-phishing-detection',
+  '--disable-default-apps',
+  '--disable-hang-monitor',
+  '--disable-popup-blocking',
+  '--disable-prompt-on-repost',
+  '--disable-sync',
+  '--metrics-recording-only',
+  '--safebrowsing-disable-auto-update',
+  '--enable-automation',
 ];
 
 // Retry wrapper for launching browser (helpful on cold starts or flakiness)
@@ -31,6 +45,8 @@ async function launchBrowserWithRetries(retries = 3) {
     }
   }
 }
+
+// (Optional) Retry wrapper for page creation, not strictly necessary with puppeteer-extra, but can be added if desired.
 
 async function analyzeUrl(url, options = {}) {
   let browser;
@@ -66,8 +82,27 @@ async function analyzeUrl(url, options = {}) {
 
     await page.setRequestInterception(true);
 
+    // Block non-essential resource types and known trackers/ads by host
+    const blockedHosts = [
+      'doubleclick.net',
+      'google-analytics.com',
+      'googletagmanager.com',
+      'googlesyndication.com',
+      'adservice.google.com',
+      'facebook.net',
+      'facebook.com',
+      // Add more as needed
+    ];
+
     page.on('request', (req) => {
+      const urlObj = new URL(req.url());
       const resourceType = req.resourceType();
+
+      // Block known tracking/ad hosts early
+      if (blockedHosts.some(host => urlObj.hostname.includes(host))) {
+        return req.abort();
+      }
+      // Abort non-essential resource types
       if (['image', 'media', 'font', 'stylesheet'].includes(resourceType)) {
         return req.abort();
       }
@@ -116,6 +151,7 @@ async function analyzeUrl(url, options = {}) {
     await page.setExtraHTTPHeaders({ 'Accept-Language': 'en-US,en;q=0.9' });
     await page.setViewport({ width: 1366, height: 768 });
 
+    // Use explicit timeout for navigation
     await page.goto(url, {
       waitUntil: 'networkidle2',
       timeout: 60000,
