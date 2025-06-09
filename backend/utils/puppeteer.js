@@ -16,16 +16,26 @@ const launchArgs = [
   '--disable-gpu',
 ];
 
+// Retry wrapper for launching browser (helpful on cold starts or flakiness)
+async function launchBrowserWithRetries(retries = 3) {
+  for (let i = 0; i < retries; i++) {
+    try {
+      return await puppeteer.launch({
+        headless: 'new',
+        args: launchArgs,
+        executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
+      });
+    } catch (error) {
+      if (i === retries - 1) throw error;
+      await new Promise((res) => setTimeout(res, 2000));
+    }
+  }
+}
+
 async function analyzeUrl(url, options = {}) {
   let browser;
   try {
-    browser = await puppeteer.launch({
-      headless: 'new',
-      args: launchArgs,
-      timeout: 180000,
-      protocolTimeout: 120000,
-      executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
-    });
+    browser = await launchBrowserWithRetries();
 
     const page = await browser.newPage();
     await page.setBypassCSP(true);
