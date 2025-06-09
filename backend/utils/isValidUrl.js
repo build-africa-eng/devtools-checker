@@ -1,3 +1,6 @@
+const { URL } = require('url');
+const logger = require('./logger');
+
 /**
  * Validates URL format
  * @param {string} url - The URL to validate
@@ -5,14 +8,20 @@
  */
 function isValidUrl(url) {
   try {
-    // Create URL object (throws error for invalid formats)
+    if (typeof url !== 'string' || url.length > 2048) {
+      logger.warn(`Invalid URL: Length exceeds 2048 characters or not a string: ${url.slice(0, 50)}...`);
+      return false;
+    }
     const parsed = new URL(url);
-    
-    // Check protocol is HTTP/HTTPS
-    return ['http:', 'https:'].includes(parsed.protocol);
+    const isValid = ['http:', 'https:'].includes(parsed.protocol);
+    if (!isValid) {
+      logger.warn(`Invalid URL protocol: ${parsed.protocol} for ${url}`);
+    }
+    return isValid;
   } catch (error) {
+    logger.warn(`Invalid URL format: ${url} | Error: ${error.message}`);
     return false;
   }
 }
 
-module.exports = isValidUrl;
+module.exports = { isValidUrl };
