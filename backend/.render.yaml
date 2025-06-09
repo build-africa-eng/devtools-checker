@@ -4,9 +4,7 @@ services:
     env: node
     repo: https://github.com/build-africa-eng/devtools-checker
     branch: main
-    buildCommand: |
-      npm install
-      npx puppeteer browsers install chrome
+    buildCommand: npm install
     startCommand: npm start
     preDeployCommand: |
       apt-get update
@@ -37,3 +35,5 @@ services:
     envVars:
       - key: NODE_VERSION
         value: 22.16.0
+      - key: PUPPETEER_DOWNLOAD_HOST
+        value: https://ipv4.edgedl.me.gvt1.com
