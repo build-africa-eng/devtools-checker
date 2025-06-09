@@ -10,7 +10,7 @@
   "dependencies": {
     "express": "^5.1.0",
     "ws": "^8.18.2",
-    "ip": "^2.0.1",
+    "ipaddr.js": "^2.2.0",
     "swagger-ui-express": "^5.0.1",
     "winston-daily-rotate-file": "^5.0.0",
     "puppeteer-extra": "^3.3.6",
