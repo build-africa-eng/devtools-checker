@@ -8,7 +8,7 @@ const app = express();
 const corsOptions = {
   origin: process.env.NODE_ENV === 'production' 
     ? 'https://devtools-checker.pages.dev' 
-    : 'http://localhost:5173', // Default Vite dev server port
+    : 'http://localhost:5173',
 };
 app.use(cors(corsOptions));
 app.use(express.json());
