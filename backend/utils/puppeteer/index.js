@@ -1,7 +1,7 @@
 const { URL } = require('url');
 const WebSocket = require('ws');
 const fs = require('fs').promises;
-const { isUrlValid } = require('../isUrlValid');
+const { isValidUrl } = require('../isValidUrl');
 const { logger } = require('../logger');
 const { launchBrowserWithRetries } = require('./launchBrowser');
 const { setupLogging } = require('./setupLogging');
@@ -9,7 +9,14 @@ const { setupNetworkCapture } = require('./setupNetworkCapture');
 const { runLighthouse } = require('./runLighthouse');
 const { runAccessibility } = require('./runAccessibility');
 const { setupTracing } = require('./setupTracing');
-const { captureTouchAndGestureEvents, captureHtml, captureScreenshot, captureMobileMetrics, inspectElement, executeScript } = require('./helpers');
+const {
+  captureTouchAndGestureEvents,
+  captureHtml,
+  captureScreenshot,
+  captureMobileMetrics,
+  inspectElement,
+  executeScript
+} = require('./helpers');
 
 /**
  * Analyzes a webpage URL, mimicking Chrome DevTools for mobile users
@@ -19,8 +26,11 @@ const { captureTouchAndGestureEvents, captureHtml, captureScreenshot, captureMob
  */
 async function analyzeUrl(url, options = {}) {
   let browser, page, wsServer;
+
+  const result = {};
+
   try {
-    if (!isUrlValid(url)) throw new Error('Invalid URL');
+    if (!isValidUrl(url)) throw new Error('Invalid URL');
 
     const {
       device = 'iPhone 12',
@@ -39,10 +49,10 @@ async function analyzeUrl(url, options = {}) {
       onlyImportantLogs = false,
       navigationTimeout = 30000,
       networkConditionsType = 'Fast 4G',
-      inspectElement = null,
+      inspectElement: inspectSelector = null,
       filterRequestTypes = ['document', 'xhr', 'fetch', 'script'],
       filterDomains = [],
-      executeScript = null,
+      executeScript: scriptToRun = null,
       debug = false,
       enableWebSocket = false,
       cpuThrottlingRate = 1,
@@ -57,14 +67,17 @@ async function analyzeUrl(url, options = {}) {
     ({ browser, page } = await launchBrowserWithRetries(3, device, customDevice, debug));
     await page.setBypassCSP(true);
 
-    if (NETWORK_CONDITIONS[networkConditionsType]) {
-      await page.emulateNetworkConditions(NETWORK_CONDITIONS[networkConditionsType]);
+    // Emulate network conditions
+    if (global.NETWORK_CONDITIONS && global.NETWORK_CONDITIONS[networkConditionsType]) {
+      await page.emulateNetworkConditions(global.NETWORK_CONDITIONS[networkConditionsType]);
       if (debug) logger('info', `Using network: ${networkConditionsType}`);
     }
 
+    // Emulate CPU throttling
     await page.emulateCPUThrottling(cpuThrottlingRate);
     if (debug && cpuThrottlingRate !== 1) logger('info', `Applied CPU throttling: ${cpuThrottlingRate}x`);
 
+    // WebSocket setup
     if (enableWebSocket) {
       wsServer = new WebSocket.Server({ port: 8081 });
       wsServer.on('connection', (ws) => {
@@ -90,9 +103,24 @@ async function analyzeUrl(url, options = {}) {
     const gestureEvents = [];
     await captureTouchAndGestureEvents(page);
 
-    const logs = setupLogging(page, { maxLogs, onlyImportantLogs, captureStacks, debug, enableWebSocket }, touchEvents, gestureEvents, wsServer);
+    const logs = setupLogging(page, {
+      maxLogs,
+      onlyImportantLogs,
+      captureStacks,
+      debug,
+      enableWebSocket
+    }, touchEvents, gestureEvents, wsServer);
+
     const { requests, networkWaterfall } = await setupNetworkCapture(page, {
-      captureHeaders, captureResponseBodies, maxBodySize, maxRequests, filterRequestTypes, filterDomains, requestTimeout, outputDir, enableWebSocket,
+      captureHeaders,
+      captureResponseBodies,
+      maxBodySize,
+      maxRequests,
+      filterRequestTypes,
+      filterDomains,
+      requestTimeout,
+      outputDir,
+      enableWebSocket
     }, wsServer);
 
     let stopTracing;
@@ -104,38 +132,46 @@ async function analyzeUrl(url, options = {}) {
     await page.goto(url, { waitUntil: 'networkidle2', timeout: navigationTimeout });
     const loadTime = Date.now() - startTime;
 
-    if (includePerformanceTrace) {
+    if (includePerformanceTrace && stopTracing) {
       result.performanceTrace = await stopTracing();
     }
 
-    const result = {
-      title: await page.title(),
-      loadTime,
-      logs,
-      requests,
-      touchEvents,
-      gestureEvents,
-      networkWaterfall: networkWaterfall(),
-      mobileMetrics: await captureMobileMetrics(page, debug),
-      summary: {
-        errors: logs.filter(l => l.level === 'PAGE_ERROR').length,
-        warnings: logs.filter(l => l.level === 'warning').length,
-        requests: requests.length,
-        loadTime,
-      },
+    // Base metadata
+    result.title = await page.title();
+    result.loadTime = loadTime;
+    result.logs = logs;
+    result.requests = requests;
+    result.touchEvents = touchEvents;
+    result.gestureEvents = gestureEvents;
+    result.networkWaterfall = networkWaterfall();
+    result.mobileMetrics = await captureMobileMetrics(page, debug);
+
+    result.summary = {
+      errors: logs.filter(l => l.level === 'PAGE_ERROR').length,
+      warnings: logs.filter(l => l.level === 'warning').length,
+      requests: requests.length,
+      loadTime
     };
 
+    // Optional captures
     if (includeHtml) result.html = await captureHtml(page, debug);
     if (includeScreenshot) result.screenshot = await captureScreenshot(page, outputDir, debug);
     if (includeLighthouse) result.lighthouse = await runLighthouse(page, browser, debug);
     if (includeAccessibility) result.accessibility = await runAccessibility(page, debug);
-    if (inspectElement) result.element = await inspectElement(page, inspectElement, debug);
-    if (executeScript) result.scriptResult = await executeScript(page, executeScript, debug);
+    if (inspectSelector) result.element = await inspectElement(page, inspectSelector, debug);
+    if (scriptToRun) result.scriptResult = await executeScript(page, scriptToRun, debug);
+
+    // Recursive analysis of links
     if (followLinks) {
-      const links = await page.$$eval('a', as => as.map(a => a.href).filter(href => href.startsWith('http')));
+      const links = await page.$$eval('a', as =>
+        as.map(a => a.href).filter(href => href.startsWith('http'))
+      );
       result.relatedPages = await Promise.all(
         [...new Set(links)].slice(0, maxLinks).map(link =>
-          analyzeUrl(link, { ...options, followLinks: false }).catch(err => ({ url: link, error: err.message }))
+          analyzeUrl(link, { ...options, followLinks: false }).catch(err => ({
+            url: link,
+            error: err.message
+          }))
         )
       );
     }
