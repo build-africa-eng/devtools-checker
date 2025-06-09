@@ -9,6 +9,8 @@
   },
   "dependencies": {
     "express": "^5.1.0",
+    "ws": "^8.18.2",
+    "winston-daily-rotate-file" "^5.0.0",
     "puppeteer-extra": "^3.3.6",
     "node-cache": "^5.1.2",
     "@axe-core/puppeteer": "^4.10.2",
