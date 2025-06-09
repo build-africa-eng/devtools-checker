@@ -11,7 +11,7 @@ app.set('trust proxy', true);
 const corsOptions = {
   origin: process.env.NODE_ENV === 'production' 
     ? 'https://devtools-checker.pages.dev' 
-    : 'http://localhost:5173',
+    : 'http://localhost:5000',
 };
 app.use(cors(corsOptions));
 app.use(express.json());
