@@ -2,11 +2,9 @@ const puppeteer = require('puppeteer-extra');
 const StealthPlugin = require('puppeteer-extra-plugin-stealth');
 const AdblockerPlugin = require('puppeteer-extra-plugin-adblocker');
 
-// Apply plugins to puppeteer
 puppeteer.use(StealthPlugin());
 puppeteer.use(AdblockerPlugin({ blockTrackers: true }));
 
-// Optimized launch arguments for performance and stability in various environments
 const launchArgs = [
   '--no-sandbox',
   '--disable-setuid-sandbox',
@@ -18,22 +16,14 @@ const launchArgs = [
   '--disable-gpu',
 ];
 
-/**
- * Analyzes a given URL using Puppeteer to collect logs, network requests, and other data.
- * @param {string} url The URL to analyze.
- * @param {object} [options] Optional settings.
- * @param {boolean} [options.includeHtml=false] Whether to include the full page HTML.
- * @param {boolean} [options.includeScreenshot=false] Whether to include a Base64-encoded screenshot.
- * @returns {Promise<object>} A promise that resolves to an object containing the analysis data.
- */
 async function analyzeUrl(url, options = {}) {
   let browser;
   try {
     browser = await puppeteer.launch({
       headless: 'new',
       args: launchArgs,
-      timeout: 180000, // 3-minute timeout for browser launch
-      protocolTimeout: 60000, // 1-minute protocol timeout
+      timeout: 180000,
+      protocolTimeout: 60000,
       executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
     });
 
@@ -46,7 +36,6 @@ async function analyzeUrl(url, options = {}) {
     const MAX_LOGS = 200;
     const MAX_REQUESTS = 500;
 
-    // --- Set up page event listeners ---
     page.on('console', (msg) => {
       if (logs.length < MAX_LOGS) {
         logs.push({
@@ -86,13 +75,12 @@ async function analyzeUrl(url, options = {}) {
       if (requestData) {
         requestData.status = res.status();
         const endTime = process.hrtime.bigint();
-        // Explicitly handle BigInt to avoid serialization issues
-        const timeDiff = Number(endTime - requestData.startTime); // Convert BigInt difference to number
+        // Explicitly convert BigInt to number to avoid serialization issues
+        const timeDiff = Number(endTime - requestData.startTime); // Ensure subtraction result is a number
         requestData.time = timeDiff / 1e6; // Convert to milliseconds
       }
     });
 
-    // --- Navigate and gather data ---
     await page.setUserAgent(
       'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36'
     );
