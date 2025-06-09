@@ -13,12 +13,16 @@ export function useAnalysis() {
     if (lowered.includes('timeout')) {
       return 'The website took too long to respond and the analysis timed out.';
     }
+    if (lowered.includes('networkerror') || lowered.includes('dns')) {
+      return 'Network issue: Please check your internet connection or try a different URL.';
+    }
     return msg || 'An unknown error occurred.';
   };
 
   const analyze = async (url, options = {}) => {
-    if (!url || typeof url !== 'string' || !url.trim().startsWith('http')) {
-      setError('Please enter a valid URL, starting with http or https.');
+    const trimmedUrl = url?.trim();
+    if (!trimmedUrl || !/^https?:\/\//i.test(trimmedUrl)) {
+      setError('Please enter a valid URL starting with http:// or https://');
       return null;
     }
 
@@ -27,45 +31,52 @@ export function useAnalysis() {
     setResult(null);
 
     try {
-      const apiUrl = `${import.meta.env.VITE_API_URL || '[invalid url, do not cite]'}/api/analyze`;
-      console.log('Fetching:', apiUrl); // Debug log
+      const baseApi = import.meta.env.VITE_API_URL;
+      if (!baseApi || baseApi.startsWith('[invalid')) {
+        throw new Error('API URL is not configured. Check VITE_API_URL.');
+      }
+
+      const apiUrl = `${baseApi}/api/analyze`;
+      const body = JSON.stringify({
+        url: trimmedUrl,
+        options: { ...options, onlyImportantLogs: true },
+      });
 
       const response = await fetch(apiUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url, options }),
+        body,
       });
 
       if (!response.ok) {
-        const text = await response.text(); // Get raw response
-        console.error('Raw response:', text); // Debug
-        throw new Error(`HTTP error ${response.status}: ${text || 'No response body'}`);
+        const text = await response.text();
+        throw new Error(`HTTP ${response.status}: ${text || 'No response body'}`);
       }
 
-      const data = await response.json().catch(err => {
+      const data = await response.json().catch((err) => {
         throw new Error(`Invalid JSON response: ${err.message}`);
       });
 
-      if (data?.error) {
-        throw new Error(data.error);
-      }
+      if (data?.error) throw new Error(data.error);
 
-      const formattedResult = {
-        title: data.title || 'Untitled Page',
-        html: data.html,
-        screenshot: data.screenshot,
-        logs: Array.isArray(data.logs) ? data.logs : [],
-        requests: Array.isArray(data.requests) ? data.requests : [],
-        warning: data.warning || null,
-      };
+      const {
+        title = 'Untitled Page',
+        html = '',
+        screenshot = '',
+        logs = [],
+        requests = [],
+        performance = { domContentLoaded: -1, load: -1 },
+        warning = null,
+      } = data;
 
+      const formattedResult = { title, html, screenshot, logs, requests, performance, warning };
       setResult(formattedResult);
       return formattedResult;
     } catch (err) {
       const userMessage = friendlyError(err.message);
       setError(userMessage);
       setResult(null);
-      console.error('Analysis error:', err); // Debug
+      console.error('Analysis error:', err);
       return null;
     } finally {
       setLoading(false);
