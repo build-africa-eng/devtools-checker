@@ -4,6 +4,9 @@ const analyzeRouter = require('./routes/analyze');
 
 const app = express();
 
+// Trust proxy for Render
+app.set('trust proxy', true);
+
 // Configure CORS based on environment
 const corsOptions = {
   origin: process.env.NODE_ENV === 'production' 
@@ -14,7 +17,7 @@ app.use(cors(corsOptions));
 app.use(express.json());
 
 // Routes
-app.use('/api/analyze', analyzeRouter); // Changed from '/analyze' to '/api/analyze'
+app.use('/api/analyze', analyzeRouter);
 
 // Root GET route for clarity
 app.get('/', (req, res) => {
