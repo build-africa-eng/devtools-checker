@@ -1,17 +1,17 @@
-function Tab({ label, isActive, onClick }) {
+// src/components/Tab.jsx
+import React from 'react';
+
+export default function Tab({ label, isActive, onClick, count }) {
   return (
     <button
       role="tab"
       aria-selected={isActive}
-      tabIndex={isActive ? 0 : -1}
       onClick={onClick}
-      className={`flex-1 p-2 text-center transition-colors duration-200 border-b-2 font-medium
-        ${isActive ? 'bg-gray-700 border-blue-500 text-white' : 'bg-gray-800 border-transparent text-gray-400 hover:bg-gray-700'}
-      `}
+      className={`px-4 py-2 -mb-px border-b-2 ${
+        isActive ? 'border-blue-500 text-blue-600 font-semibold' : 'border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
+      }`}
     >
-      {label}
+      {label} {typeof count === 'number' && <span className="ml-1 text-sm text-gray-400">({count})</span>}
     </button>
   );
 }
-
-export default Tab;
