@@ -4,7 +4,6 @@ const { logger } = require('./utils/logger');
 const analyzeRouter = require('./routes/analyze');
 
 const app = express();
-
 app.set('trust proxy', 1); // Trust Render's first proxy
 
 // CORS configuration
@@ -15,18 +14,27 @@ const corsOptions = {
   optionsSuccessStatus: 200,
 };
 app.use(cors(corsOptions));
-app.use(express.json({ limit: '10mb' })); // Limit JSON body size
+
+// Log middleware
+app.use((req, res, next) => {
+  logger.info(`Incoming ${req.method} request to ${req.originalUrl} from IP ${req.ip}`);
+  next();
+});
+
+app.use(express.json({ limit: '10mb' }));
 
 // Routes
 app.use('/api/analyze', analyzeRouter);
 
 // Root endpoint
 app.get('/', (req, res) => {
+  logger.info('GET /');
   res.json({ message: 'DevTools Checker Backend - Use POST /api/analyze to analyze URLs' });
 });
 
 // API info endpoint
 app.get('/api/analyze', (req, res) => {
+  logger.info('GET /api/analyze');
   res.json({
     message: 'Use POST /api/analyze with a JSON body { "url": "https://example.com", "options": {...} }',
     supportedOptions: [
@@ -42,16 +50,18 @@ app.get('/api/analyze', (req, res) => {
 
 // Health check endpoint
 app.get('/health', (req, res) => {
+  logger.info('GET /health');
   res.json({ status: 'healthy', uptime: process.uptime() });
 });
 
 // Error handling middleware
 app.use((err, req, res, next) => {
-  logger('error', `Unhandled error: ${err.stack || err.message}`);
+  logger.error(`Unhandled error in ${req.method} ${req.originalUrl}: ${err.stack || err.message}`);
   res.status(500).json({ error: 'Internal server error' });
 });
 
+// Start server
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
-  logger('info', `Server running on port ${PORT}`);
+  logger.info(`🚀 Server running on port ${PORT} in ${process.env.NODE_ENV || 'development'} mode`);
 });
