@@ -1,6 +1,9 @@
 /** @type {import('tailwindcss').Config} */
+const plugin = require('tailwindcss/plugin');
+
 module.exports = {
   content: ['./src/**/*.{js,jsx,ts,tsx}'],
+  darkMode: 'class', // Optional: switch between dark/light using 'class'
   theme: {
     extend: {
       colors: {
@@ -14,22 +17,42 @@ module.exports = {
       fontFamily: {
         inter: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
       },
+      minWidth: {
+        button: '36px',
+      },
+      minHeight: {
+        button: '36px',
+      },
+      boxShadow: {
+        soft: '0 2px 6px rgba(0,0,0,0.08)',
+        focus: '0 0 0 2px rgba(26, 115, 232, 0.5)',
+      },
+      spacing: {
+        '1.25': '0.3125rem',
+        '4.5': '1.125rem',
+        '7': '1.75rem',
+      },
     },
   },
-  plugins: [],
-  future: {
-    hoverOnlyWhenSupported: true,
-  },
-  // Responsive button sizes
   screens: {
     sm: '640px',
   },
-  extend: {
-    minWidth: {
-      button: '36px',
-    },
-    minHeight: {
-      button: '36px',
-    },
+  plugins: [
+    require('@tailwindcss/forms'),       // Better form controls
+    require('@tailwindcss/typography'),  // Prose content (blog, docs)
+    require('@tailwindcss/aspect-ratio'),// Maintain video/image ratios
+    // Optional custom plugin: adds `.bg-stripes` utility
+    plugin(function ({ addUtilities }) {
+      addUtilities({
+        '.bg-stripes': {
+          backgroundImage:
+            'linear-gradient(45deg, rgba(255,255,255,0.05) 25%, transparent 25%, transparent 50%, rgba(255,255,255,0.05) 50%, rgba(255,255,255,0.05) 75%, transparent 75%, transparent)',
+          backgroundSize: '1rem 1rem',
+        },
+      });
+    }),
+  ],
+  future: {
+    hoverOnlyWhenSupported: true,
   },
 };
