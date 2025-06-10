@@ -76,7 +76,7 @@ async function analyzeUrl(url, options = {}) {
     await page.emulateCPUThrottling(cpuThrottlingRate);
     if (debug && cpuThrottlingRate !== 1) logger('info', `Applied CPU throttling: ${cpuThrottlingRate}x`);
 
-    // WebSocket setup
+    // WebSocket setup (production: use env URL, dev: local ws server)
     let webSocketUrl = null;
     if (enableWebSocket) {
       if (process.env.NODE_ENV === 'production') {
@@ -91,7 +91,7 @@ async function analyzeUrl(url, options = {}) {
           ws.on('message', async (msg) => {
             try {
               const { action, data } = JSON.parse(msg);
-              if (action === 'click') {
+              if (action === 'click' && data.selector) {
                 await page.click(data.selector);
                 ws.send(JSON.stringify({ status: 'Clicked', selector: data.selector }));
               } else if (action === 'reload') {
