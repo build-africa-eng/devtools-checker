@@ -3,17 +3,22 @@ import { CheckCircle, XCircle, Clock } from 'lucide-react';
 
 function NetworkLog({ requests }) {
   if (!requests || requests.length === 0) {
-    return <p className="text-gray-400 italic">No network requests found</p>;
+    return (
+      <p className="text-gray-400 italic text-center">
+        No network requests found.
+      </p>
+    );
   }
 
   const getStatusIcon = (status) => {
+    const commonProps = { className: 'h-4 w-4 shrink-0', 'aria-hidden': true };
     if (typeof status === 'number' && status >= 400) {
-      return <XCircle className="h-4 w-4 text-red-500 shrink-0" aria-label="Error" />;
+      return <XCircle {...commonProps} className="text-red-500" />;
     }
     if (typeof status === 'number') {
-      return <CheckCircle className="h-4 w-4 text-green-500 shrink-0" aria-label="Success" />;
+      return <CheckCircle {...commonProps} className="text-green-500" />;
     }
-    return <Clock className="h-4 w-4 text-gray-400 shrink-0" aria-label="Pending" />;
+    return <Clock {...commonProps} className="text-gray-400" />;
   };
 
   const getBackground = (status) => {
@@ -26,33 +31,37 @@ function NetworkLog({ requests }) {
 
   return (
     <div className="space-y-2">
-      {requests.map((req, index) => (
-        <div
-          key={index}
-          className={`p-2 rounded flex items-start gap-2 border-l-4 ${getBackground(req.status)}`}
-          role="region"
-          aria-label={`Network request ${req.method ?? 'GET'} ${req.url ?? ''}`}
-        >
-          {getStatusIcon(req.status)}
-          <div className="flex-1 overflow-hidden">
-            <p className="font-mono text-sm break-words whitespace-pre-wrap">
-              {req.method ?? 'GET'} {req.url ?? '(no url)'}
-            </p>
-            <p className="text-xs text-gray-300 mt-1">
-              <span>Status: {req.status ?? 'N/A'}</span> |{' '}
-              <span>Type: {req.type ?? 'unknown'}</span> |{' '}
-              <span>
-                Time:{' '}
-                {req.time === -1 || req.time == null ? (
-                  'N/A'
-                ) : (
-                  <>{req.time}ms</>
-                )}
-              </span>
-            </p>
+      {requests.map((req, index) => {
+        const status = req.status;
+        const method = req.method ?? 'GET';
+        const url = req.url ?? '(no url)';
+        const time =
+          req.time === -1 || req.time == null ? 'N/A' : `${req.time}ms`;
+        const type = req.type ?? 'unknown';
+
+        return (
+          <div
+            key={index}
+            className={`p-3 rounded flex items-start gap-3 border-l-4 ${getBackground(
+              status
+            )}`}
+            role="region"
+            aria-label={`Network request: ${method} ${url}`}
+          >
+            {getStatusIcon(status)}
+            <div className="flex-1 overflow-hidden">
+              <p className="font-mono text-sm break-words whitespace-pre-wrap">
+                {method} {url}
+              </p>
+              <p className="text-xs text-gray-300 mt-1 space-x-2">
+                <span>Status: {status ?? 'N/A'}</span>
+                <span>Type: {type}</span>
+                <span>Time: {time}</span>
+              </p>
+            </div>
           </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
