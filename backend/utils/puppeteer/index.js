@@ -1,8 +1,5 @@
-const { URL } = require('url');
-const WebSocket = require('ws');
-const fs = require('fs').promises;
-const { isValidUrl } = require('../isValidUrl');
-const { logger } = require('../logger');
+const { isValidUrl } = require('./isValidUrl');
+const { logger } = require('./logger');
 const { launchBrowserWithRetries } = require('./launchBrowser');
 const { setupLogging } = require('./setupLogging');
 const { setupNetworkCapture } = require('./setupNetworkCapture');
@@ -17,13 +14,9 @@ const {
   inspectElement,
   executeScript
 } = require('./helpers');
+const WebSocket = require('ws');
+const fs = require('fs').promises;
 
-/**
- * Analyzes a webpage URL, mimicking Chrome DevTools for mobile users
- * @param {string} url - Target URL
- * @param {object} options - Configuration
- * @returns {Promise<object>} Analysis result
- */
 async function analyzeUrl(url, options = {}) {
   let browser, page, wsServer;
   const result = {};
@@ -31,6 +24,7 @@ async function analyzeUrl(url, options = {}) {
   try {
     if (!isValidUrl(url)) throw new Error('Invalid URL');
 
+    // Default options
     const {
       device = 'iPhone 12',
       customDevice = null,
@@ -63,27 +57,13 @@ async function analyzeUrl(url, options = {}) {
 
     await fs.mkdir(outputDir, { recursive: true });
 
-    ({ browser, page } = await launchBrowserWithRetries(3, device, customDevice, debug));
-    await page.setBypassCSP(true);
-
-    // Emulate network conditions
-    if (global.NETWORK_CONDITIONS && global.NETWORK_CONDITIONS[networkConditionsType]) {
-      await page.emulateNetworkConditions(global.NETWORK_CONDITIONS[networkConditionsType]);
-      if (debug) logger('info', `Using network: ${networkConditionsType}`);
-    }
-
-    // Emulate CPU throttling
-    await page.emulateCPUThrottling(cpuThrottlingRate);
-    if (debug && cpuThrottlingRate !== 1) logger('info', `Applied CPU throttling: ${cpuThrottlingRate}x`);
-
-    // WebSocket setup (production: use env URL, dev: local ws server)
+    // WebSocket integration
     let webSocketUrl = null;
     if (enableWebSocket) {
       if (process.env.NODE_ENV === 'production') {
         webSocketUrl = process.env.WEBSOCKET_URL || null;
         if (debug) logger('info', `WebSocket in production mode, url: ${webSocketUrl}`);
       } else {
-        // For local development, start a local WebSocket server
         wsServer = new WebSocket.Server({ port: 8081 });
         webSocketUrl = 'ws://localhost:8081';
         wsServer.on('connection', (ws) => {
@@ -105,6 +85,16 @@ async function analyzeUrl(url, options = {}) {
         });
       }
     }
+
+    ({ browser, page } = await launchBrowserWithRetries(3, device, customDevice, debug));
+    await page.setBypassCSP(true);
+
+    if (global.NETWORK_CONDITIONS && global.NETWORK_CONDITIONS[networkConditionsType]) {
+      await page.emulateNetworkConditions(global.NETWORK_CONDITIONS[networkConditionsType]);
+      if (debug) logger('info', `Using network: ${networkConditionsType}`);
+    }
+    await page.emulateCPUThrottling(cpuThrottlingRate);
+    if (debug && cpuThrottlingRate !== 1) logger('info', `Applied CPU throttling: ${cpuThrottlingRate}x`);
 
     const touchEvents = [];
     const gestureEvents = [];
@@ -143,7 +133,6 @@ async function analyzeUrl(url, options = {}) {
       result.performanceTrace = await stopTracing();
     }
 
-    // Base metadata
     result.title = await page.title();
     result.loadTime = loadTime;
     result.logs = logs;
@@ -160,7 +149,6 @@ async function analyzeUrl(url, options = {}) {
       loadTime
     };
 
-    // Optional captures
     if (includeHtml) result.html = await captureHtml(page, debug);
     if (includeScreenshot) result.screenshot = await captureScreenshot(page, outputDir, debug);
     if (includeLighthouse) result.lighthouse = await runLighthouse(page, browser, debug);
@@ -168,7 +156,6 @@ async function analyzeUrl(url, options = {}) {
     if (inspectSelector) result.element = await inspectElement(page, inspectSelector, debug);
     if (scriptToRun) result.scriptResult = await executeScript(page, scriptToRun, debug);
 
-    // Recursive analysis of links
     if (followLinks) {
       const links = await page.$$eval('a', as =>
         as.map(a => a.href).filter(href => href.startsWith('http'))
@@ -183,7 +170,6 @@ async function analyzeUrl(url, options = {}) {
       );
     }
 
-    // Attach WebSocket URL if enabled and available
     if (enableWebSocket && webSocketUrl) {
       result.webSocket = { url: webSocketUrl, actions: ['click', 'reload'] };
     }
