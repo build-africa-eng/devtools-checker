@@ -1,4 +1,4 @@
-const { logger } = require('../logger');
+const { logger } = require('./logger');
 
 function setupLogging(page, options, touchEvents, gestureEvents, wsServer) {
   const { maxLogs = 200, onlyImportantLogs = false, captureStacks = true, debug = false, enableWebSocket = false } = options;
@@ -27,8 +27,13 @@ function setupLogging(page, options, touchEvents, gestureEvents, wsServer) {
     }
 
     logs.push(logEntry);
-    if (enableWebSocket) {
-      wsServer?.clients.forEach(client => client.send(JSON.stringify({ type: 'log', data: logEntry })));
+
+    if (enableWebSocket && wsServer) {
+      wsServer.clients.forEach(client => {
+        if (client.readyState === 1) {
+          client.send(JSON.stringify({ type: 'log', data: logEntry }));
+        }
+      });
     }
   });
 
@@ -36,8 +41,12 @@ function setupLogging(page, options, touchEvents, gestureEvents, wsServer) {
     if (logs.length < maxLogs) {
       const errorLog = { level: 'PAGE_ERROR', message: err.message, stack: err.stack, timestamp: new Date().toISOString() };
       logs.push(errorLog);
-      if (enableWebSocket) {
-        wsServer?.clients.forEach(client => client.send(JSON.stringify({ type: 'error', data: errorLog })));
+      if (enableWebSocket && wsServer) {
+        wsServer.clients.forEach(client => {
+          if (client.readyState === 1) {
+            client.send(JSON.stringify({ type: 'error', data: errorLog }));
+          }
+        });
       }
     }
   });
