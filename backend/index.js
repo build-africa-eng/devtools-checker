@@ -23,6 +23,9 @@ app.use((req, res, next) => {
 
 app.use(express.json({ limit: '10mb' }));
 
+// Pass WebSocket URL from env to router via app locals
+app.locals.webSocketUrl = process.env.WEBSOCKET_URL || null;
+
 // Routes
 app.use('/api/analyze', analyzeRouter);
 
@@ -38,11 +41,10 @@ app.get('/api/analyze', (req, res) => {
   res.json({
     message: 'Use POST /api/analyze with a JSON body { "url": "https://example.com", "options": {...} }',
     supportedOptions: [
-      'device', 'customDevice', 'includeHtml', 'includeScreenshot', 'includeLighthouse',
-      'includeAccessibility', 'includePerformanceTrace', 'captureStacks', 'captureHeaders',
-      'captureResponseBodies', 'maxBodySize', 'maxLogs', 'maxRequests', 'onlyImportantLogs',
-      'navigationTimeout', 'networkConditionsType', 'inspectElement', 'filterRequestTypes',
-      'filterDomains', 'executeScript', 'debug', 'enableWebSocket', 'cpuThrottlingRate',
+      'device', 'customDevice', 'includeHtml', 'includeScreenshot', 'includeLighthouse', 'includeAccessibility',
+      'includePerformanceTrace', 'captureStacks', 'captureHeaders', 'captureResponseBodies', 'maxBodySize', 'maxLogs',
+      'maxRequests', 'onlyImportantLogs', 'navigationTimeout', 'networkConditionsType', 'inspectElement',
+      'filterRequestTypes', 'filterDomains', 'executeScript', 'debug', 'enableWebSocket', 'cpuThrottlingRate',
       'followLinks', 'maxLinks', 'requestTimeout', 'outputDir',
     ],
   });
