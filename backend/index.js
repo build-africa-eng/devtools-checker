@@ -1,6 +1,6 @@
 const express = require('express');
 const cors = require('cors');
-const { logger } = require('./utils/logger');
+const logger = require('./utils/logger');
 const analyzeRouter = require('./routes/analyze');
 
 const app = express();
