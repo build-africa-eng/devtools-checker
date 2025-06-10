@@ -1,6 +1,6 @@
 const puppeteer = require('puppeteer-extra');
 const { LAUNCH_ARGS, MOBILE_DEVICES } = require('./constants');
-const { logger } = require('../logger');
+const { logger } = require('../utils/logger');
 
 async function launchBrowserWithRetries(retries = 3, device = 'iPhone 12', customDevice = null, debug = false) {
   for (let i = 0; i < retries; i++) {
