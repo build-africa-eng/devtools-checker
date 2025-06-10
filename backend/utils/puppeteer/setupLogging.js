@@ -1,4 +1,4 @@
-const { logger } = require('../logger');
+const { logger } = require('../utils/logger');
 
 function setupLogging(page, options, touchEvents, gestureEvents, wsServer) {
   const { maxLogs = 200, onlyImportantLogs = false, captureStacks = true, debug = false, enableWebSocket = false } = options;
