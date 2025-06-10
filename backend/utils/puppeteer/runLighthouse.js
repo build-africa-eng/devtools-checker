@@ -11,7 +11,7 @@ async function runLighthouse(page, browser, debug = false) {
     });
     return { score: lhr.categories, audits: lhr.audits };
   } catch (err) {
-    logger('error', `Lighthouse failed: ${err.message}`);
+    logger.error(`Lighthouse failed: ${err.message}`);
     return { error: err.message };
   }
 }
