@@ -1,7 +1,7 @@
 const express = require('express');
 const rateLimit = require('express-rate-limit');
 const NodeCache = require('node-cache');
-const { analyzeUrl } = require('../utils/puppeteer');
+const analyzeUrl = require('../utils/puppeteer');
 const isValidUrl = require('../utils/isValidUrl');
 const logger = require('../utils/logger');
 
