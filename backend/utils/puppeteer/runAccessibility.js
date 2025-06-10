@@ -1,5 +1,5 @@
 const { AxePuppeteer } = require('@axe-core/puppeteer');
-const { logger } = require('../logger');
+const { logger } = require('../utils/logger');
 
 async function runAccessibility(page, debug = false) {
   try {
