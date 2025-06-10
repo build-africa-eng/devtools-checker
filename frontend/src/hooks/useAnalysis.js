@@ -6,7 +6,8 @@ export function useAnalysis() {
   const [error, setError] = useState(null);
   const [controller, setController] = useState(null);
   const retryLimit = 2;
-  const pollRef = useRef(null); // For polling
+  const pollRef = useRef(null);
+  const wsRef = useRef(null);
 
   const friendlyError = (msg = '') => {
     const lowered = msg.toLowerCase();
@@ -18,6 +19,12 @@ export function useAnalysis() {
     }
     if (lowered.includes('networkerror') || lowered.includes('dns')) {
       return 'Network issue: Please check your internet connection or try a different URL.';
+    }
+    if (lowered.includes('http 404')) {
+      return 'Resource not found (404). Please check the URL.';
+    }
+    if (lowered.includes('http 500')) {
+      return 'Server error (500). Please try again later or contact support.';
     }
     return msg || 'An unknown error occurred.';
   };
@@ -31,7 +38,18 @@ export function useAnalysis() {
     }
   };
 
-  const cancel = () => controller?.abort?.();
+  const cleanupWebSocket = () => {
+    if (wsRef.current) {
+      wsRef.current.close();
+      wsRef.current = null;
+    }
+  };
+
+  const cancel = () => {
+    controller?.abort?.();
+    cleanupWebSocket();
+    stopPolling();
+  };
 
   const analyze = async (url, options = {}) => {
     const trimmedUrl = url?.trim();
@@ -50,6 +68,7 @@ export function useAnalysis() {
       setLoading(true);
       setError(null);
       setResult(null);
+      cleanupWebSocket();
 
       try {
         const baseApi = import.meta.env.VITE_API_URL;
@@ -108,7 +127,8 @@ export function useAnalysis() {
 
         // Optional: listen for live updates via WebSocket
         if (webSocket?.url) {
-          const socket = new WebSocket(webSocket.url);
+          const socket = new window.WebSocket(webSocket.url);
+          wsRef.current = socket;
           socket.onmessage = (event) => {
             try {
               const liveUpdate = JSON.parse(event.data);
@@ -120,6 +140,12 @@ export function useAnalysis() {
                 }));
               }
             } catch {}
+          };
+          socket.onerror = () => {
+            // Optionally report WebSocket error to the user
+          };
+          socket.onclose = () => {
+            wsRef.current = null;
           };
         }
 
@@ -134,7 +160,10 @@ export function useAnalysis() {
         if (attempt === retryLimit) {
           setError(friendlyError(message));
           setResult(null);
-          console.error('Analysis error:', { message: err.message, stack: err.stack, url: trimmedUrl, options });
+          if (import.meta.env.DEV) {
+            // eslint-disable-next-line no-console
+            console.error('Analysis error:', { message: err.message, stack: err.stack, url: trimmedUrl, options });
+          }
           return null;
         }
         await new Promise((res) => setTimeout(res, 500 + attempt * 500)); // Backoff
@@ -149,19 +178,24 @@ export function useAnalysis() {
 
   // Optional auto-refresh (polling)
   const startPolling = (url, options = {}, interval = 60000) => {
-    clearInterval(pollRef.current);
+    stopPolling();
     pollRef.current = setInterval(() => {
       analyze(url, options);
     }, interval);
   };
 
   const stopPolling = () => {
-    clearInterval(pollRef.current);
-    pollRef.current = null;
+    if (pollRef.current) {
+      clearInterval(pollRef.current);
+      pollRef.current = null;
+    }
   };
 
   useEffect(() => {
-    return () => stopPolling(); // Cleanup on unmount
+    return () => {
+      stopPolling();
+      cleanupWebSocket();
+    };
   }, []);
 
   return {
