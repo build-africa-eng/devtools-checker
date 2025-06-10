@@ -1,5 +1,5 @@
 const { isValidUrl } = require('../isValidUrl');
-const { logger } = require('../utils/logger');
+const { logger } = require('../logger');
 const { launchBrowserWithRetries } = require('./launchBrowser');
 const { setupLogging } = require('./setupLogging');
 const { setupNetworkCapture } = require('./setupNetworkCapture');
