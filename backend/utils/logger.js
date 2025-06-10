@@ -5,12 +5,11 @@ const path = require('path');
 const fs = require('fs');
 
 // Ensure log directory exists
-const logDir = path.join(__dirname, '../logs');
+const logDir = path.join(__dirname, '../../logs');
 if (!fs.existsSync(logDir)) {
   fs.mkdirSync(logDir, { recursive: true });
 }
 
-// Format for console
 const consoleFormat = format.combine(
   format.colorize(),
   format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
@@ -22,7 +21,6 @@ const consoleFormat = format.combine(
   })
 );
 
-// Format for files
 const fileFormat = format.combine(
   format.timestamp(),
   format.errors({ stack: true }),
@@ -30,7 +28,6 @@ const fileFormat = format.combine(
   format.json()
 );
 
-// Base logger config
 const logger = winston.createLogger({
   level: process.env.NODE_ENV === 'production' ? 'info' : 'debug',
   transports: [
@@ -57,7 +54,6 @@ const logger = winston.createLogger({
   ],
 });
 
-// Request-specific log helper
 logger.request = (req, message, level = 'info', extra = {}) => {
   const ip =
     req.ip || req.headers['x-forwarded-for'] || req.connection?.remoteAddress || 'unknown';
@@ -71,14 +67,12 @@ logger.request = (req, message, level = 'info', extra = {}) => {
   });
 };
 
-// Handle unhandled promise rejections globally
 process.on('unhandledRejection', (reason) => {
   logger.error('Unhandled Rejection:', { reason: reason?.stack || reason });
 });
 
-// Handle uncaught exceptions if not handled by winston itself
 process.on('uncaughtException', (err) => {
   logger.error('Uncaught Exception:', { error: err?.stack || err });
 });
 
-module.exports = { logger };
+module.exports = logger;
