@@ -67,6 +67,7 @@ logger.request = (req, message, level = 'info', extra = {}) => {
   });
 };
 
+// Global error handlers
 process.on('unhandledRejection', (reason) => {
   logger.error('Unhandled Rejection:', { reason: reason?.stack || reason });
 });
