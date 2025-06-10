@@ -15,8 +15,9 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     sourcemap: false,
-    manifest: true, // Generate manifest.json
+    manifest: true, // Generate manifest.json for debugging
     rollupOptions: {
+      input: './index.html', // Explicitly set entry point
       output: {
         manualChunks: {
           vendor: ['react', 'react-dom'],
