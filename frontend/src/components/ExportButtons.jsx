@@ -43,36 +43,53 @@ const ExportButtons = ({ data }) => {
     createDownload(csvBlob, filename);
   };
 
+  const hasLogs = Array.isArray(data?.logs) && data.logs.length > 0;
+  const hasRequests = Array.isArray(data?.requests) && data.requests.length > 0;
+
+  const buttonBase =
+    'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition focus:outline-none min-w-button min-h-button';
+
   return (
-    <div className="flex flex-wrap gap-4 mt-4">
+    <div className="flex flex-wrap gap-4 mt-4" role="group" aria-label="Export buttons">
       <button
-        onClick={() => exportJSON(data?.logs, 'console-logs.json')}
-        className="flex items-center gap-2 px-4 py-2 bg-secondary text-white font-medium rounded-lg transition hover:bg-secondary/80 focus:outline-none min-w-button min-h-button"
-        aria-label="Export all console logs as JSON"
+        onClick={() => exportJSON(data.logs, 'console-logs.json')}
+        className={`${buttonBase} bg-secondary text-white hover:bg-secondary/80 disabled:opacity-50`}
+        disabled={!hasLogs}
+        aria-label="Export console logs as JSON"
+        title="Export console logs as JSON"
       >
         <FileJson className="w-4 h-4" />
         Logs JSON
       </button>
+
       <button
-        onClick={() => exportCSV(data?.logs, 'console-logs.csv')}
-        className="flex items-center gap-2 px-4 py-2 bg-accent text-black font-medium rounded-lg transition hover:bg-accent/70 focus:outline-none min-w-button min-h-button"
-        aria-label="Export all console logs as CSV"
+        onClick={() => exportCSV(data.logs, 'console-logs.csv')}
+        className={`${buttonBase} bg-accent text-black hover:bg-accent/70 disabled:opacity-50`}
+        disabled={!hasLogs}
+        aria-label="Export console logs as CSV"
+        title="Export console logs as CSV"
       >
         <FileDown className="w-4 h-4 text-gray-800" />
         Logs CSV
       </button>
+
       <button
-        onClick={() => exportJSON(data?.requests, 'network-requests.json')}
-        className="flex items-center gap-2 px-4 py-2 bg-secondary text-white font-medium rounded-lg transition hover:bg-secondary/80 focus:outline-none min-w-button min-h-button"
-        aria-label="Export all network requests as JSON"
+        onClick={() => exportJSON(data.requests, 'network-requests.json')}
+        className={`${buttonBase} bg-secondary text-white hover:bg-secondary/80 disabled:opacity-50`}
+        disabled={!hasRequests}
+        aria-label="Export network requests as JSON"
+        title="Export network requests as JSON"
       >
         <FileJson className="w-4 h-4" />
         Requests JSON
       </button>
+
       <button
-        onClick={() => exportCSV(data?.requests, 'network-requests.csv')}
-        className="flex items-center gap-2 px-4 py-2 bg-accent text-black font-medium rounded-lg transition hover:bg-accent/70 focus:outline-none min-w-button min-h-button"
-        aria-label="Export all network requests as CSV"
+        onClick={() => exportCSV(data.requests, 'network-requests.csv')}
+        className={`${buttonBase} bg-accent text-black hover:bg-accent/70 disabled:opacity-50`}
+        disabled={!hasRequests}
+        aria-label="Export network requests as CSV"
+        title="Export network requests as CSV"
       >
         <FileDown className="w-4 h-4 text-gray-800" />
         Requests CSV
