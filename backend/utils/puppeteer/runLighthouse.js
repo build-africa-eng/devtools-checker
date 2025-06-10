@@ -1,6 +1,6 @@
 const lighthouse = require('lighthouse');
 const { URL } = require('url');
-const { logger } = require('../utils/logger');
+const { logger } = require('../logger');
 
 async function runLighthouse(page, browser, debug = false) {
   try {
