@@ -6,7 +6,7 @@ async function runAccessibility(page, debug = false) {
     const axe = new AxePuppeteer(page);
     return await axe.analyze();
   } catch (err) {
-    logger('error', `Accessibility audit failed: ${err.message}`);
+    logger.error(`Accessibility audit failed: ${err.message}`);
     return { error: err.message };
   }
 }
