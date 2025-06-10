@@ -1,4 +1,4 @@
-const { isValidUrl } = require('../isValidUrl');
+const isValidUrl = require('../isValidUrl');
 const logger = require('../logger');
 const { launchBrowserWithRetries } = require('./launchBrowser');
 const { setupLogging } = require('./setupLogging');
