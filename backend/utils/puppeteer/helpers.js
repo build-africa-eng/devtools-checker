@@ -2,7 +2,7 @@ const { promisify } = require('util');
 const zlib = require('zlib');
 const fs = require('fs').promises;
 const deflate = promisify(zlib.deflate);
-const { logger } = require('../logger');
+const logger = require('../logger');
 
 async function captureTouchAndGestureEvents(page) {
   await page.evaluate(() => {
