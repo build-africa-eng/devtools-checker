@@ -1,4 +1,4 @@
-const { logger } = require('../logger');
+const logger = require('../logger');
 const path = require('path');
 
 async function setupTracing(page, outputDir, debug = false) {
