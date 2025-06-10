@@ -7,7 +7,7 @@ async function setupTracing(page, outputDir, debug = false) {
     await page.tracing.start({ path: traceFile, screenshots: true });
     if (debug) logger('info', `Tracing started: ${traceFile}`);
   } catch (err) {
-    if (debug) logger('error', `Failed to start tracing: ${err.message}`);
+    if (debug) logger.error(`Failed to start tracing: ${err.message}`);
     throw err;
   }
 
@@ -17,7 +17,7 @@ async function setupTracing(page, outputDir, debug = false) {
       if (debug) logger('info', `Tracing stopped: ${traceFile}`);
       return traceFile;
     } catch (err) {
-      if (debug) logger('error', `Failed to stop tracing: ${err.message}`);
+      if (debug) logger.error(`Failed to stop tracing: ${err.message}`);
       throw err;
     }
   };
