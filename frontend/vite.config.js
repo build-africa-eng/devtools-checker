@@ -3,6 +3,7 @@ import react from '@vitejs/plugin-react';
 
 export default defineConfig({
   plugins: [react()],
+  base: '/', // Serve assets from root
   server: {
     proxy: {
       '/api': {
@@ -14,12 +15,16 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     sourcemap: false,
+    manifest: true, // Generate manifest.json for debugging
     rollupOptions: {
       output: {
         manualChunks: {
           vendor: ['react', 'react-dom'],
         },
       },
+    },
+    css: {
+      devSourcemap: true,
     },
   },
 });
