@@ -16,15 +16,16 @@ function ConsoleLog({ logs }) {
   }
 
   const getLogIcon = (level) => {
+    const commonProps = { className: 'w-4 h-4 shrink-0', 'aria-hidden': true };
     switch (level) {
       case 'error':
-        return <AlertCircle className="w-4 h-4 text-red-500" />;
+        return <AlertCircle {...commonProps} className="text-red-500" />;
       case 'warn':
-        return <AlertTriangle className="w-4 h-4 text-yellow-500" />;
+        return <AlertTriangle {...commonProps} className="text-yellow-500" />;
       case 'info':
-        return <Info className="w-4 h-4 text-blue-500" />;
+        return <Info {...commonProps} className="text-blue-500" />;
       default:
-        return <MessageCircle className="w-4 h-4 text-gray-500" />;
+        return <MessageCircle {...commonProps} className="text-gray-500" />;
     }
   };
 
@@ -46,25 +47,26 @@ function ConsoleLog({ logs }) {
       {logs.map((log, index) => (
         <div
           key={index}
-          className={`flex items-start gap-3 p-3 rounded border-l-4 ${getLevelStyles(
-            log.level
-          )}`}
+          className={`flex items-start gap-3 p-3 rounded border-l-4 ${getLevelStyles(log.level)}`}
+          role="group"
+          aria-label={`Console log ${index + 1} - ${log.level}`}
         >
           {getLogIcon(log.level)}
           <div className="flex-1 space-y-1">
-            <p className="font-mono text-sm break-words whitespace-pre-wrap">
+            <pre className="font-mono text-sm whitespace-pre-wrap break-words">
               {Array.isArray(log.message)
                 ? log.message.map((m, i) => (
-                    <span key={i}>
+                    <React.Fragment key={i}>
                       {typeof m === 'object'
                         ? JSON.stringify(m, null, 2)
                         : String(m)}{' '}
-                    </span>
+                    </React.Fragment>
                   ))
                 : typeof log.message === 'object'
                 ? JSON.stringify(log.message, null, 2)
                 : String(log.message)}
-            </p>
+            </pre>
+
             {(log.timestamp || log.location) && (
               <div className="text-xs text-gray-400 space-y-0.5">
                 {log.timestamp && <p>{log.timestamp}</p>}
