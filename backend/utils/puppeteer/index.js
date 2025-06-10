@@ -26,7 +26,6 @@ const {
  */
 async function analyzeUrl(url, options = {}) {
   let browser, page, wsServer;
-
   const result = {};
 
   try {
@@ -78,25 +77,33 @@ async function analyzeUrl(url, options = {}) {
     if (debug && cpuThrottlingRate !== 1) logger('info', `Applied CPU throttling: ${cpuThrottlingRate}x`);
 
     // WebSocket setup
+    let webSocketUrl = null;
     if (enableWebSocket) {
-      wsServer = new WebSocket.Server({ port: 8081 });
-      wsServer.on('connection', (ws) => {
-        if (debug) logger('info', 'WebSocket client connected');
-        ws.on('message', async (msg) => {
-          try {
-            const { action, data } = JSON.parse(msg);
-            if (action === 'click') {
-              await page.click(data.selector);
-              ws.send(JSON.stringify({ status: 'Clicked', selector: data.selector }));
-            } else if (action === 'reload') {
-              await page.reload();
-              ws.send(JSON.stringify({ status: 'Reloaded' }));
+      if (process.env.NODE_ENV === 'production') {
+        webSocketUrl = process.env.WEBSOCKET_URL || null;
+        if (debug) logger('info', `WebSocket in production mode, url: ${webSocketUrl}`);
+      } else {
+        // For local development, start a local WebSocket server
+        wsServer = new WebSocket.Server({ port: 8081 });
+        webSocketUrl = 'ws://localhost:8081';
+        wsServer.on('connection', (ws) => {
+          if (debug) logger('info', 'WebSocket client connected');
+          ws.on('message', async (msg) => {
+            try {
+              const { action, data } = JSON.parse(msg);
+              if (action === 'click') {
+                await page.click(data.selector);
+                ws.send(JSON.stringify({ status: 'Clicked', selector: data.selector }));
+              } else if (action === 'reload') {
+                await page.reload();
+                ws.send(JSON.stringify({ status: 'Reloaded' }));
+              }
+            } catch (err) {
+              ws.send(JSON.stringify({ error: err.message }));
             }
-          } catch (err) {
-            ws.send(JSON.stringify({ error: err.message }));
-          }
+          });
         });
-      });
+      }
     }
 
     const touchEvents = [];
@@ -174,6 +181,11 @@ async function analyzeUrl(url, options = {}) {
           }))
         )
       );
+    }
+
+    // Attach WebSocket URL if enabled and available
+    if (enableWebSocket && webSocketUrl) {
+      result.webSocket = { url: webSocketUrl, actions: ['click', 'reload'] };
     }
 
     return result;
