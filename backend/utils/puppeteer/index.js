@@ -62,12 +62,12 @@ async function analyzeUrl(url, options = {}) {
     if (enableWebSocket) {
       if (process.env.NODE_ENV === 'production') {
         webSocketUrl = process.env.WEBSOCKET_URL || null;
-        if (debug) logger('info', `WebSocket in production mode, url: ${webSocketUrl}`);
+        if (debug) logger.info(`WebSocket in production mode, url: ${webSocketUrl}`);
       } else {
         wsServer = new WebSocket.Server({ port: 8081 });
         webSocketUrl = 'ws://localhost:8081';
         wsServer.on('connection', (ws) => {
-          if (debug) logger('info', 'WebSocket client connected');
+          if (debug) logger.info('WebSocket client connected');
           ws.on('message', async (msg) => {
             try {
               const { action, data } = JSON.parse(msg);
@@ -91,10 +91,10 @@ async function analyzeUrl(url, options = {}) {
 
     if (global.NETWORK_CONDITIONS && global.NETWORK_CONDITIONS[networkConditionsType]) {
       await page.emulateNetworkConditions(global.NETWORK_CONDITIONS[networkConditionsType]);
-      if (debug) logger('info', `Using network: ${networkConditionsType}`);
+      if (debug) logger.info(`Using network: ${networkConditionsType}`);
     }
     await page.emulateCPUThrottling(cpuThrottlingRate);
-    if (debug && cpuThrottlingRate !== 1) logger('info', `Applied CPU throttling: ${cpuThrottlingRate}x`);
+    if (debug && cpuThrottlingRate !== 1) logger.info(`Applied CPU throttling: ${cpuThrottlingRate}x`);
 
     const touchEvents = [];
     const gestureEvents = [];
@@ -177,19 +177,19 @@ async function analyzeUrl(url, options = {}) {
     return result;
 
   } catch (err) {
-    logger('error', `Analysis failed: ${err.message}`);
+    logger.error(`Analysis failed: ${err.message}`);
     return { error: err.message };
   } finally {
     if (wsServer) wsServer.close();
     if (browser) {
       try {
         await browser.close();
-        if (options.debug) logger('info', 'Browser closed');
+        if (options.debug) logger.info('Browser closed');
       } catch (err) {
-        if (options.debug) logger('warn', `Error closing browser: ${err.message}`);
+        if (options.debug) logger.warn(`Error closing browser: ${err.message}`);
       }
     }
   }
 }
 
-module.exports = { analyzeUrl };
+module.exports = analyzeUrl;
