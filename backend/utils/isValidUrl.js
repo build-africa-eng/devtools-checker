@@ -1,4 +1,3 @@
-// backend/utils/isValidUrl.js
 const { URL } = require('url');
 const ipaddr = require('ipaddr.js');
 const logger = require('./logger');
@@ -19,25 +18,20 @@ function isValidUrl(url) {
       logger.warn(`Invalid URL protocol: ${parsed.protocol} for ${url}`);
       return false;
     }
-
     const hostname = parsed.hostname;
-    // Check if hostname is an IP address
     try {
       const addr = ipaddr.parse(hostname);
       if (addr.isPrivate()) {
         logger.warn(`Private IP rejected: ${hostname}`);
         return false;
       }
-    } catch (e) {
-      // Not an IP address (e.g., domain name), continue validation
+    } catch {
+      // Not an IP, continue
     }
-
-    // Additional checks for localhost
     if (hostname.toLowerCase() === 'localhost') {
       logger.warn(`Localhost rejected: ${hostname}`);
       return false;
     }
-
     return true;
   } catch (error) {
     logger.warn(`Invalid URL format: ${url} | Error: ${error.message}`);
@@ -45,4 +39,4 @@ function isValidUrl(url) {
   }
 }
 
-module.exports = { isValidUrl };
+module.exports = isValidUrl;
