@@ -15,7 +15,7 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     sourcemap: false,
-    manifest: true, // Generate manifest.json for debugging
+    manifest: true, // Generate manifest.json
     rollupOptions: {
       output: {
         manualChunks: {
