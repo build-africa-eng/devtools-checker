@@ -1,9 +1,12 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 export function useAnalysis() {
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [controller, setController] = useState(null);
+  const retryLimit = 2;
+  const pollRef = useRef(null); // For polling
 
   const friendlyError = (msg = '') => {
     const lowered = msg.toLowerCase();
@@ -19,6 +22,17 @@ export function useAnalysis() {
     return msg || 'An unknown error occurred.';
   };
 
+  const validateApiUrl = (url) => {
+    try {
+      new URL(url);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  const cancel = () => controller?.abort?.();
+
   const analyze = async (url, options = {}) => {
     const trimmedUrl = url?.trim();
     if (!trimmedUrl || !/^https?:\/\//i.test(trimmedUrl)) {
@@ -26,62 +40,137 @@ export function useAnalysis() {
       return null;
     }
 
-    setLoading(true);
-    setError(null);
-    setResult(null);
+    let attempt = 0;
 
-    try {
-      const baseApi = import.meta.env.VITE_API_URL;
-      if (!baseApi || baseApi.startsWith('[invalid')) {
-        throw new Error('API URL is not configured. Check VITE_API_URL.');
-      }
+    while (attempt <= retryLimit) {
+      const ctrl = new AbortController();
+      setController(ctrl);
+      const timeoutId = setTimeout(() => ctrl.abort(), 30000);
 
-      const apiUrl = `${baseApi}/api/analyze`;
-      const body = JSON.stringify({
-        url: trimmedUrl,
-        options: { ...options, onlyImportantLogs: true },
-      });
-
-      const response = await fetch(apiUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body,
-      });
-
-      if (!response.ok) {
-        const text = await response.text();
-        throw new Error(`HTTP ${response.status}: ${text || 'No response body'}`);
-      }
-
-      const data = await response.json().catch((err) => {
-        throw new Error(`Invalid JSON response: ${err.message}`);
-      });
-
-      if (data?.error) throw new Error(data.error);
-
-      const {
-        title = 'Untitled Page',
-        html = '',
-        screenshot = '',
-        logs = [],
-        requests = [],
-        performance = { domContentLoaded: -1, load: -1 },
-        warning = null,
-      } = data;
-
-      const formattedResult = { title, html, screenshot, logs, requests, performance, warning };
-      setResult(formattedResult);
-      return formattedResult;
-    } catch (err) {
-      const userMessage = friendlyError(err.message);
-      setError(userMessage);
+      setLoading(true);
+      setError(null);
       setResult(null);
-      console.error('Analysis error:', err);
-      return null;
-    } finally {
-      setLoading(false);
+
+      try {
+        const baseApi = import.meta.env.VITE_API_URL;
+        if (!baseApi || !validateApiUrl(baseApi)) {
+          throw new Error('API URL is not configured correctly. Check VITE_API_URL in your environment.');
+        }
+
+        const apiUrl = new URL('/api/analyze', baseApi).href;
+        const body = JSON.stringify({
+          url: trimmedUrl,
+          options: {
+            ...options,
+            onlyImportantLogs: true,
+            debug: import.meta.env.DEV,
+          },
+        });
+
+        const response = await fetch(apiUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body,
+          signal: ctrl.signal,
+        }).finally(() => clearTimeout(timeoutId));
+
+        if (!response.ok) {
+          const text = await response.text().catch(() => 'No response body');
+          throw new Error(`HTTP ${response.status}: ${text}`);
+        }
+
+        const data = await response.json();
+        if (data?.error) throw new Error(data.error);
+
+        const {
+          title = 'Untitled Page',
+          html = '',
+          screenshot = '',
+          logs = [],
+          requests = [],
+          performance = { domContentLoaded: -1, load: -1 },
+          warning = null,
+          webSocket = null,
+        } = data;
+
+        const formattedResult = {
+          title,
+          html,
+          screenshot,
+          logs: Array.isArray(logs) ? logs : [],
+          requests: Array.isArray(requests) ? requests : [],
+          performance: typeof performance === 'object' ? performance : { domContentLoaded: -1, load: -1 },
+          warning,
+          webSocket,
+        };
+
+        setResult(formattedResult);
+
+        // Optional: listen for live updates via WebSocket
+        if (webSocket?.url) {
+          const socket = new WebSocket(webSocket.url);
+          socket.onmessage = (event) => {
+            try {
+              const liveUpdate = JSON.parse(event.data);
+              if (liveUpdate.logs || liveUpdate.requests) {
+                setResult((prev) => ({
+                  ...prev,
+                  logs: [...(prev?.logs || []), ...(liveUpdate.logs || [])],
+                  requests: [...(prev?.requests || []), ...(liveUpdate.requests || [])],
+                }));
+              }
+            } catch {}
+          };
+        }
+
+        return formattedResult;
+      } catch (err) {
+        const message =
+          err.name === 'AbortError'
+            ? 'Request timed out'
+            : typeof err.message === 'string'
+              ? err.message
+              : 'Unexpected error';
+        if (attempt === retryLimit) {
+          setError(friendlyError(message));
+          setResult(null);
+          console.error('Analysis error:', { message: err.message, stack: err.stack, url: trimmedUrl, options });
+          return null;
+        }
+        await new Promise((res) => setTimeout(res, 500 + attempt * 500)); // Backoff
+      } finally {
+        setLoading(false);
+        setController(null);
+      }
+
+      attempt++;
     }
   };
 
-  return { analyze, loading, error, result };
+  // Optional auto-refresh (polling)
+  const startPolling = (url, options = {}, interval = 60000) => {
+    clearInterval(pollRef.current);
+    pollRef.current = setInterval(() => {
+      analyze(url, options);
+    }, interval);
+  };
+
+  const stopPolling = () => {
+    clearInterval(pollRef.current);
+    pollRef.current = null;
+  };
+
+  useEffect(() => {
+    return () => stopPolling(); // Cleanup on unmount
+  }, []);
+
+  return {
+    analyze,
+    cancel,
+    loading,
+    error,
+    result,
+    startPolling,
+    stopPolling,
+  };
 }
