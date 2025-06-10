@@ -1,7 +1,7 @@
 const { URL } = require('url');
 const fs = require('fs').promises;
 const { BLOCKED_HOSTS } = require('./constants');
-const { logger } = require('./logger');
+const { logger } = require('../logger');
 
 async function setupNetworkCapture(page, options, wsServer) {
   const {
