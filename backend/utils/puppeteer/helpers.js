@@ -25,14 +25,14 @@ async function captureTouchAndGestureEvents(page) {
 async function captureHtml(page, debug = false) {
   const html = await page.content();
   const compressed = (await deflate(html)).toString('base64');
-  if (debug) logger('info', 'Captured and compressed HTML');
+  if (debug) logger.info('Captured and compressed HTML'); // ✅ CORRECT
   return compressed;
 }
 
 async function captureScreenshot(page, outputDir, debug = false) {
   const ss = await page.screenshot({ encoding: 'binary', fullPage: true });
   const compressed = (await deflate(ss)).toString('base64');
-  if (debug) logger('info', 'Captured and compressed screenshot');
+  if (debug) logger.info('Captured and compressed screenshot'); // ✅ CORRECT
   return compressed;
 }
 
@@ -45,7 +45,7 @@ async function captureMobileMetrics(page, debug = false) {
       usedJSHeapSize: performance.memory.usedJSHeapSize,
     } : null,
   }));
-  if (debug) logger('info', 'Captured mobile metrics');
+  if (debug) logger.info('Captured mobile metrics'); // ✅ CORRECT
   return metrics;
 }
 
@@ -58,17 +58,17 @@ async function inspectElement(page, selector, debug = false) {
       boundingBox: el.getBoundingClientRect().toJSON(),
     } : null;
   }, selector);
-  if (debug) logger('info', `Inspected element: ${selector}`);
+  if (debug) logger.info(`Inspected element: ${selector}`); // ✅ CORRECT
   return element;
 }
 
 async function executeScript(page, script, debug = false) {
   try {
     const result = await page.evaluate(script);
-    if (debug) logger('info', 'Executed custom script');
+    if (debug) logger.info('Executed custom script'); // ✅ CORRECT
     return result;
   } catch (err) {
-    logger('error', `Script execution failed: ${err.message}`);
+    logger.error(`Script execution failed: ${err.message}`); // ✅ CORRECT
     return { error: err.message };
   }
 }
