@@ -1,7 +1,7 @@
 const { URL } = require('url');
 const fs = require('fs').promises;
 const { BLOCKED_HOSTS } = require('./constants');
-const { logger } = require('../logger');
+const { logger } = require('./logger');
 
 async function setupNetworkCapture(page, options, wsServer) {
   const {
@@ -89,17 +89,27 @@ async function setupNetworkCapture(page, options, wsServer) {
       requestData.errorText = err.message;
     }
 
-    if (enableWebSocket) {
-      wsServer?.clients.forEach(client => client.send(JSON.stringify({ type: 'request', data: requestData })));
+    if (enableWebSocket && wsServer) {
+      wsServer.clients.forEach(client => {
+        if (client.readyState === 1) {
+          client.send(JSON.stringify({ type: 'request', data: requestData }));
+        }
+      });
     }
   });
 
-  return { requests, networkWaterfall: () => requests.map(r => ({
-    url: r.url,
-    start: Number(r.startTime) / 1e6,
-    duration: r.timing?.total || 0,
-    status: r.status,
-  })).sort((a, b) => a.start - b.start) };
+  return {
+    requests,
+    networkWaterfall: () =>
+      requests
+        .map(r => ({
+          url: r.url,
+          start: Number(r.startTime) / 1e6,
+          duration: r.timing?.total || 0,
+          status: r.status,
+        }))
+        .sort((a, b) => a.start - b.start)
+  };
 }
 
 module.exports = { setupNetworkCapture };
