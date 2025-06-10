@@ -1,4 +1,3 @@
-// src/components/UrlInput.js
 import React, { useState } from 'react';
 import AnalyzeButton from './AnalyzeButton';
 
@@ -6,20 +5,23 @@ function UrlInput({ onAnalyze, loading, globalError }) {
   const [url, setUrl] = useState('');
   const [localError, setLocalError] = useState('');
 
+  const normalizeUrl = (input) => {
+    let trimmed = input.trim();
+    if (!/^https?:\/\//i.test(trimmed)) {
+      trimmed = `https://${trimmed}`;
+    }
+    return trimmed;
+  };
+
   const handleAnalyzeClick = () => {
     if (!url.trim()) {
       setLocalError('Please enter a URL.');
       return;
     }
 
-    // Normalize URL: add https:// if missing
-    let finalUrl = url.trim();
-    if (!/^https?:\/\//i.test(finalUrl)) {
-      finalUrl = `https://${finalUrl}`;
-    }
-
+    const finalUrl = normalizeUrl(url);
     setLocalError('');
-    onAnalyze(finalUrl);
+    onAnalyze(finalUrl); // normalized URL sent to parent
   };
 
   return (
