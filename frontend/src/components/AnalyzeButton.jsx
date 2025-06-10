@@ -3,13 +3,15 @@ import { Play } from 'lucide-react';
 import PropTypes from 'prop-types';
 
 const AnalyzeButton = ({ onAnalyze, loading, disabled = false }) => {
+  const isDisabled = loading || disabled;
+
   return (
     <button
       type="button"
       onClick={onAnalyze}
-      disabled={loading || disabled}
-      className={`flex items-center gap-2 px-4 py-2 rounded min-w-[120px] min-h-[40px] font-medium transition-colors ${
-        loading || disabled
+      disabled={isDisabled}
+      className={`flex items-center justify-center gap-2 px-4 py-2 rounded min-w-[120px] min-h-[40px] font-medium transition-colors ${
+        isDisabled
           ? 'bg-primary text-white opacity-50 cursor-not-allowed'
           : 'bg-primary text-white hover:bg-primary/90'
       }`}
