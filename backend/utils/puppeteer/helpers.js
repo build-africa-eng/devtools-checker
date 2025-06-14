@@ -72,6 +72,45 @@ async function captureMobileMetrics(page, debug = false) {
   return metrics;
 }
 
+async function getDomMetrics(page, debug = false) {
+  if (!page) {
+    logger.error('Invalid page instance for capturing DOM metrics');
+    return null;
+  }
+  const metrics = await Promise.race([
+    page.evaluate(() => {
+      function getNodeCount(node = document) {
+        let count = 1;
+        if (node.children) {
+          Array.from(node.children).forEach(child => {
+            count += getNodeCount(child);
+          });
+        }
+        return count;
+      }
+
+      function getMaxDepth(node = document, depth = 0) {
+        let maxDepth = depth;
+        if (node.children) {
+          Array.from(node.children).forEach(child => {
+            maxDepth = Math.max(maxDepth, getMaxDepth(child, depth + 1));
+          });
+        }
+        return maxDepth;
+      }
+
+      return {
+        nodeCount: getNodeCount(),
+        maxDepth: getMaxDepth(),
+        hasLargeDom: getNodeCount() > 1500, // Arbitrary threshold for large DOM
+      };
+    }),
+    new Promise((_, reject) => setTimeout(() => reject(new Error('DOM metrics capture timed out')), 5000)),
+  ]);
+  if (debug) logger.info('Captured DOM metrics');
+  return metrics;
+}
+
 async function inspectElement(page, selector, debug = false) {
   if (!page) {
     logger.error('Invalid page instance for inspecting element');
@@ -115,6 +154,7 @@ module.exports = {
   captureHtml,
   captureScreenshot,
   captureMobileMetrics,
+  getDomMetrics, // New function
   inspectElement,
   executeScript,
 };
