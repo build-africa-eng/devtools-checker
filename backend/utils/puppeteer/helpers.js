@@ -99,10 +99,23 @@ async function getDomMetrics(page, debug = false) {
         return maxDepth;
       }
 
+      function getElementBreakdown() {
+        const breakdown = {};
+        const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_ELEMENT);
+        let node = walker.nextNode();
+        while (node) {
+          const tag = node.tagName.toLowerCase();
+          breakdown[tag] = (breakdown[tag] || 0) + 1;
+          node = walker.nextNode();
+        }
+        return breakdown;
+      }
+
       return {
         nodeCount: getNodeCount(),
         maxDepth: getMaxDepth(),
-        hasLargeDom: getNodeCount() > 1500, // Arbitrary threshold for large DOM
+        hasLargeDom: getNodeCount() > 1500,
+        elementBreakdown: getElementBreakdown(),
       };
     }),
     new Promise((_, reject) => setTimeout(() => reject(new Error('DOM metrics capture timed out')), 5000)),
@@ -154,7 +167,7 @@ module.exports = {
   captureHtml,
   captureScreenshot,
   captureMobileMetrics,
-  getDomMetrics, // New function
+  getDomMetrics,
   inspectElement,
   executeScript,
 };
