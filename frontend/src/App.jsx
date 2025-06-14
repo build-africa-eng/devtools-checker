@@ -108,7 +108,7 @@ function App() {
       stopPolling();
       startPolling(normalizedUrl);
     } else {
-      analyze(normalizedUrl);
+      analyze(normalUrl);
     }
   }, [analyze, isPolling, startPolling, stopPolling]);
 
@@ -131,8 +131,8 @@ function App() {
   }, [filteredLogs, filteredRequests]);
 
   return (
-    <div className="min-h-screen bg-red-500 dark:bg-blue-500 text-gray-900 dark:text-gray-100 flex flex-col font-sans">
-      <header className="p-4 flex justify-between items-center border-b border-gray-200 dark:border-gray-700 sticky top-0 bg-gray-100 dark:bg-gray-900 z-10">
+    <div className="min-h-screen bg-red-200 dark:bg-blue-200 text-gray-800 dark:text-gray-900 flex flex-col font-sans">
+      <header className="p-4 flex justify-between items-center border-b border-gray-300 dark:border-gray-700 sticky top-0 bg-gray-100 dark:bg-gray-800 z-10">
         <h1 className="text-2xl font-bold">DevTools Checker</h1>
         <div className="flex items-center gap-3">
           {pollingUrlRef.current && (
