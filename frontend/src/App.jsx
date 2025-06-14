@@ -1,11 +1,13 @@
 import { useState, useEffect, useCallback } from 'react';
 import UrlInput from './components/UrlInput';
-import Tab from './components/Tab'; // Confirmed import
+import Tab from './components/Tab';
 import ConsoleView from './pages/ConsoleView';
 import NetworkView from './pages/NetworkView';
 import ExportButtons from './components/ExportButtons';
 import FiltersPanel from './components/FiltersPanel';
 import LogPanel from './components/LogPanel';
+import DomView from './components/DomView'; // Assuming this is created
+import PerformanceView from './components/PerformanceView'; // New component for performance
 import { useAnalysis } from './hooks/useAnalysis';
 import { useFilteredLogs } from './hooks/useFilteredLogs';
 import { useDarkMode } from './hooks/useDarkMode';
@@ -15,7 +17,7 @@ import { formatErrorLog } from './utils/formatErrorLog';
 import { Moon, Sun, Loader2 } from 'lucide-react';
 
 function App() {
-  const { analyze, loading, error, result } = useAnalysis();
+  const { analyze, cancel, loading, error, result, startPolling, stopPolling } = useAnalysis();
   const [activeTab, setActiveTab] = useState('console');
   const [logFilter, setLogFilter] = useState('all');
   const [requestFilter, setRequestFilter] = useState('all');
@@ -25,7 +27,7 @@ function App() {
     failedRequests: false,
   });
   const { isDarkMode, toggleDarkMode } = useDarkMode();
-  const { isPolling, startPolling, stopPolling, pollingUrl } = usePolling(analyze);
+  const { isPolling, pollingUrl } = usePolling(analyze); // Simplified usage
   const { logs: runtimeLogs, log } = useRuntimeLogs();
 
   const { filteredLogs, filteredRequests, warning } = useFilteredLogs(
@@ -35,14 +37,13 @@ function App() {
     requestFilter
   );
 
-  const hasData = filteredLogs.length > 0 || filteredRequests.length > 0;
+  const hasData = filteredLogs.length > 0 || filteredRequests.length > 0 || result?.html || result?.performance;
 
   useEffect(() => {
     const handleError = (event) => {
       log(formatErrorLog(event));
       if (error) log(formatErrorLog({ message: error.message || 'Unknown error' }));
     };
-
     window.addEventListener('error', handleError);
     return () => window.removeEventListener('error', handleError);
   }, [error, log]);
@@ -72,7 +73,7 @@ function App() {
 
   useEffect(() => {
     if (result) {
-      log(`Analysis Result: ${result.logs.length} logs, ${result.requests.length} requests`);
+      log(`Analysis Result: ${result.logs?.length || 0} logs, ${result.requests?.length || 0} requests`);
     }
   }, [result, log]);
 
@@ -83,7 +84,7 @@ function App() {
   }, [filteredLogs, filteredRequests, log]);
 
   return (
-    <div className="min-h-screen bg-green-900 dark:bg-blue-900 text-black-900 dark:text-gray-100 flex flex-col font-sans">
+    <div className="min-h-screen bg-red-200 dark:bg-blue-200 text-gray-800 dark:text-gray-900 flex flex-col font-sans">
       <header className="p-4 flex justify-between items-center border-b border-gray-300 dark:border-gray-700 sticky top-0 bg-gray-100 dark:bg-gray-800 z-10">
         <h1 className="text-2xl font-bold">DevTools Checker</h1>
         <div className="flex items-center gap-3">
@@ -101,6 +102,13 @@ function App() {
             aria-label={isDarkMode ? 'Switch to light mode' : 'Switch to dark mode'}
           >
             {isDarkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+          </button>
+          <button
+            onClick={cancel}
+            className="text-sm px-3 py-1 rounded bg-red-500 text-white hover:bg-red-600 transition"
+            disabled={!loading}
+          >
+            Cancel
           </button>
         </div>
       </header>
@@ -142,6 +150,18 @@ function App() {
                 onClick={() => setActiveTab('logs')}
                 count={runtimeLogs.length}
               />
+              <Tab
+                label="DOM"
+                isActive={activeTab === 'dom'}
+                onClick={() => setActiveTab('dom')}
+                count={result?.html ? 1 : 0}
+              />
+              <Tab
+                label="Performance"
+                isActive={activeTab === 'performance'}
+                onClick={() => setActiveTab('performance')}
+                count={result?.performance?.load > 0 ? 1 : 0}
+              />
             </nav>
 
             <FiltersPanel
@@ -159,6 +179,8 @@ function App() {
             {activeTab === 'console' && <ConsoleView logs={filteredLogs} />}
             {activeTab === 'network' && <NetworkView requests={filteredRequests} />}
             {activeTab === 'logs' && <LogPanel logs={runtimeLogs} />}
+            {activeTab === 'dom' && <DomView html={result?.html} css={result?.css || []} />}
+            {activeTab === 'performance' && <PerformanceView performance={result?.performance} />}
           </>
         )}
       </main>
