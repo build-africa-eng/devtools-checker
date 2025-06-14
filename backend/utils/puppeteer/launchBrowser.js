@@ -53,27 +53,36 @@ const page = await browser.newPage();
     debug && logger.debug(`REQ ${entry.status} ${entry.method} ${entry.url}`);
   });
 
-  // CONSOLE HANDLER
-  page.on('console', async (msg) => {
-    const type = msg.type();
-    const args = msg.args();
-    const texts = await Promise.all(
-      args.map(async (arg) => {
-        try {
-          const val = await arg.jsonValue();
-          return typeof val === 'object' ? JSON.stringify(val) : String(val);
-        } catch {
-          return '[unserializable]';
-        }
-      })
-    );
-    const fullMsg = texts.join(' | ');
-    if (type === 'error') {
-      logger.error(`Console error: ${fullMsg}`);
-    } else {
-      logger.info(`[${type}] ${fullMsg}`);
+  // ========== JS CONSOLE LOGGING ==========
+page.on('console', async (msg) => {
+  const type = msg.type();
+  try {
+    // Use Promise.all to resolve all message arguments
+    const args = await Promise.all(msg.args().map(arg => arg.jsonValue()));
+    let fullMsg = '';
+
+    // Process each argument
+    for (const arg of args) {
+      if (typeof arg === 'object' && arg !== null) {
+        // Stringify objects and errors for clear logging
+        full-Msg += JSON.stringify(arg, Object.getOwnPropertyNames(arg)) + ' ';
+      } else {
+        fullMsg += arg + ' ';
+      }
     }
-  });
+
+    if (type === 'error') {
+      logger.error(`Console error: ${fullMsg.trim()}`);
+    } else {
+      logger.info(`[${type}] ${fullMsg.trim()}`);
+    }
+  } catch (err) {
+    // This catch block handles errors during the serialization process itself
+    logger.warn(`Failed to log console message: ${err.message}`);
+    // As a fallback, you can still log the raw message text
+    logger.warn(`Raw console message text: ${msg.text()}`);
+  }
+});
 
   // PAGE ERROR HANDLER WITH SAFE SCREENSHOT
   page.on('pageerror', async (err) => {
