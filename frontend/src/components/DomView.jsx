@@ -23,7 +23,6 @@ const DomView = ({ html: initialHtml, css: initialCss }) => {
   }, [initialHtml, isEditing]);
 
   const applyChanges = useCallback(() => {
-    // Placeholder: Will connect to backend later
     console.log('Applying changes:', { html, css: editedCss.split('\n') });
     setCss(editedCss.split('\n'));
     setIsEditing(false);
@@ -36,11 +35,10 @@ const DomView = ({ html: initialHtml, css: initialCss }) => {
         <textarea
           value={html}
           onChange={handleHtmlChange}
-          className="w-full h-40 p-2 bg-gray-100 dark:bg-gray-800 text-black dark:text-white rounded mb-4"
-          placeholder="Edit DOM content"
+          className="w-full h-40 p-2 bg-gray-100 dark:bg-gray-800 text-black dark:text-white rounded mb-4 sm:h-60"
         />
       ) : (
-        <pre className="bg-gray-100 dark:bg-gray-800 p-2 rounded overflow-auto max-h-60">
+        <pre className="bg-gray-100 dark:bg-gray-800 p-2 rounded overflow-auto max-h-60 sm:max-h-80">
           {html || 'No DOM data available'}
         </pre>
       )}
@@ -55,25 +53,26 @@ const DomView = ({ html: initialHtml, css: initialCss }) => {
           <textarea
             value={editedCss}
             onChange={handleCssChange}
-            className="w-full h-20 p-2 bg-gray-100 dark:bg-gray-800 text-black dark:text-white rounded"
-            placeholder="Edit CSS rules (one per line)"
+            className="w-full h-20 p-2 bg-gray-100 dark:bg-gray-800 text-black dark:text-white rounded sm:h-30"
           />
         </div>
       )}
-      <button
-        onClick={toggleEdit}
-        className="px-4 py-2 mr-2 bg-blue-500 text-white rounded hover:bg-blue-600"
-      >
-        {isEditing ? 'Cancel' : 'Edit'}
-      </button>
-      {isEditing && (
+      <div className="flex flex-col sm:flex-row gap-2">
         <button
-          onClick={applyChanges}
-          className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600"
+          onClick={toggleEdit}
+          className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 w-full sm:w-auto"
         >
-          Apply
+          {isEditing ? 'Cancel' : 'Edit'}
         </button>
-      )}
+        {isEditing && (
+          <button
+            onClick={applyChanges}
+            className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 w-full sm:w-auto"
+          >
+            Apply
+          </button>
+        )}
+      </div>
     </div>
   );
 };
