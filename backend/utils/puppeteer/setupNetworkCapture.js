@@ -19,7 +19,10 @@ async function setupNetworkCapture(page, options, wsServer) {
   const requests = [];
   const requestMap = new WeakMap();
 
-  await page.setRequestInterception(true);
+  // Validate page instance
+  if (!page) throw new Error('Invalid page instance');
+
+  await page.setRequestInterception(true).catch(() => {});
   page.on('request', async (req) => {
     const urlObj = new URL(req.url());
     const type = req.resourceType();
@@ -72,7 +75,12 @@ async function setupNetworkCapture(page, options, wsServer) {
       if (captureResponseBodies) {
         const type = res.headers()['content-type'] || '';
         if (/text|json|javascript/.test(type)) {
-          const buf = await res.buffer();
+          const buf = await Promise.race([
+            res.buffer(),
+            new Promise((_, reject) =>
+              setTimeout(() => reject(new Error('Response buffer timed out')), 10000)
+            ),
+          ]);
           requestData.size = buf.length;
           if (buf.length <= maxBodySize) {
             requestData.responseBody = buf.toString('utf8');
@@ -108,7 +116,7 @@ async function setupNetworkCapture(page, options, wsServer) {
           duration: r.timing?.total || 0,
           status: r.status,
         }))
-        .sort((a, b) => a.start - b.start)
+        .sort((a, b) => a.start - b.start),
   };
 }
 
