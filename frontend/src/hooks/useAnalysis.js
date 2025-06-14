@@ -5,31 +5,20 @@ export function useAnalysis() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [controller, setController] = useState(null);
-  const retryLimit = 2;
   const pollRef = useRef(null);
   const wsRef = useRef(null);
+  const retryLimit = 2;
 
   const friendlyError = (msg = '') => {
-    const lowered = msg.toLowerCase();
-    if (lowered.includes('failed to fetch')) {
-      return 'Cannot connect to the analysis server. Please check your network or try again later.';
-    }
-    if (lowered.includes('timeout')) {
-      return 'The website took too long to respond and the analysis timed out.';
-    }
-    if (lowered.includes('networkerror') || lowered.includes('dns')) {
-      return 'Network issue: Please check your internet connection or try a different URL.';
-    }
-    if (lowered.includes('http 404')) {
-      return 'Resource not found (404). Please check the URL.';
-    }
-    if (lowered.includes('http 500')) {
-      return 'Server error (500). Please try again later or contact support.';
-    }
+    const m = msg.toLowerCase();
+    if (m.includes('failed to fetch')) return 'Cannot connect to the server.';
+    if (m.includes('timeout')) return 'The analysis request timed out.';
+    if (m.includes('network')) return 'Network error. Check your connection.';
+    if (m.includes('unexpected token')) return 'Invalid JSON from server.';
     return msg || 'An unknown error occurred.';
   };
 
-  const validateApiUrl = (url) => {
+  const validateUrl = (url) => {
     try {
       new URL(url);
       return true;
@@ -46,7 +35,7 @@ export function useAnalysis() {
   };
 
   const cancel = () => {
-    controller?.abort?.();
+    if (controller) controller.abort?.();
     cleanupWebSocket();
     stopPolling();
   };
@@ -59,7 +48,6 @@ export function useAnalysis() {
     }
 
     let attempt = 0;
-
     while (attempt <= retryLimit) {
       const ctrl = new AbortController();
       setController(ctrl);
@@ -72,33 +60,40 @@ export function useAnalysis() {
 
       try {
         const baseApi = import.meta.env.VITE_API_URL;
-        if (!baseApi || !validateApiUrl(baseApi)) {
-          throw new Error('API URL is not configured correctly. Check VITE_API_URL in your environment.');
+        if (!baseApi || !validateUrl(baseApi)) {
+          throw new Error('Invalid or missing API URL. Check VITE_API_URL.');
         }
 
         const apiUrl = new URL('/api/analyze', baseApi).href;
-        const body = JSON.stringify({
-          url: trimmedUrl,
-          options: {
-            ...options,
-            onlyImportantLogs: true,
-            debug: import.meta.env.DEV,
-          },
-        });
-
         const response = await fetch(apiUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body,
+          body: JSON.stringify({
+            url: trimmedUrl,
+            options: {
+              ...options,
+              onlyImportantLogs: true,
+              debug: import.meta.env.DEV,
+            },
+          }),
           signal: ctrl.signal,
-        }).finally(() => clearTimeout(timeoutId));
+        });
+
+        clearTimeout(timeoutId);
 
         if (!response.ok) {
-          const text = await response.text().catch(() => 'No response body');
+          const text = await response.text();
           throw new Error(`HTTP ${response.status}: ${text}`);
         }
 
-        const data = await response.json();
+        let data;
+        try {
+          data = await response.json();
+        } catch (err) {
+          const raw = await response.text();
+          throw new Error(`Failed to parse JSON: ${err.message}\nRaw: ${raw}`);
+        }
+
         if (data?.error) throw new Error(data.error);
 
         const {
@@ -107,13 +102,13 @@ export function useAnalysis() {
           screenshot = '',
           logs = [],
           requests = [],
-          performance = { domContentLoaded: -1, load: -1, firstPaint: -1, largestContentfulPaint: -1 },
+          performance = {},
           domMetrics = {},
           warning = null,
           webSocket = null,
         } = data;
 
-        const formattedResult = {
+        const parsedResult = {
           title,
           html,
           screenshot,
@@ -125,42 +120,44 @@ export function useAnalysis() {
           webSocket,
         };
 
-        setResult(formattedResult);
+        setResult(parsedResult);
 
+        // Set up WebSocket
         if (webSocket?.url) {
-          const socket = new window.WebSocket(webSocket.url);
+          const socket = new WebSocket(webSocket.url);
           wsRef.current = socket;
-          socket.onmessage = (event) => {
+
+          socket.onmessage = (e) => {
             try {
-              const liveUpdate = JSON.parse(event.data);
-              if (liveUpdate.logs || liveUpdate.requests) {
+              const msg = JSON.parse(e.data);
+              if (msg.logs || msg.requests) {
                 setResult((prev) => ({
                   ...prev,
-                  logs: [...(prev?.logs || []), ...(liveUpdate.logs || [])],
-                  requests: [...(prev?.requests || []), ...(liveUpdate.requests || [])],
+                  logs: [...(prev?.logs || []), ...(msg.logs || [])],
+                  requests: [...(prev?.requests || []), ...(msg.requests || [])],
                 }));
               }
-            } catch {}
+            } catch {
+              if (import.meta.env.DEV) {
+                console.warn('Bad WebSocket message:', e.data);
+              }
+            }
           };
+
           socket.onerror = () => {};
           socket.onclose = () => {
             wsRef.current = null;
           };
         }
 
-        return formattedResult;
+        return parsedResult;
       } catch (err) {
-        const message =
-          err.name === 'AbortError'
-            ? 'Request timed out'
-            : typeof err.message === 'string'
-              ? err.message
-              : 'Unexpected error';
         if (attempt === retryLimit) {
-          setError(friendlyError(message));
+          const msg = err.name === 'AbortError' ? 'Request timed out' : err.message;
+          setError(friendlyError(msg));
           setResult(null);
           if (import.meta.env.DEV) {
-            console.error('Analysis error:', { message: err.message, stack: err.stack, url: trimmedUrl, options });
+            console.error('useAnalysis error:', msg);
           }
           return null;
         }
@@ -176,9 +173,7 @@ export function useAnalysis() {
 
   const startPolling = (url, options = {}, interval = 60000) => {
     stopPolling();
-    pollRef.current = setInterval(() => {
-      analyze(url, options);
-    }, interval);
+    pollRef.current = setInterval(() => analyze(url, options), interval);
   };
 
   const stopPolling = () => {
@@ -190,8 +185,8 @@ export function useAnalysis() {
 
   useEffect(() => {
     return () => {
-      stopPolling();
       cleanupWebSocket();
+      stopPolling();
     };
   }, []);
 
