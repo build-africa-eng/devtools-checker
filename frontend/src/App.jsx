@@ -1,6 +1,6 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import UrlInput from './components/UrlInput';
-import Tab from './components/Tab';
+import Tab from './components/Tab'; // Confirmed import
 import ConsoleView from './pages/ConsoleView';
 import NetworkView from './pages/NetworkView';
 import ExportButtons from './components/ExportButtons';
@@ -8,6 +8,10 @@ import FiltersPanel from './components/FiltersPanel';
 import LogPanel from './components/LogPanel';
 import { useAnalysis } from './hooks/useAnalysis';
 import { useFilteredLogs } from './hooks/useFilteredLogs';
+import { useDarkMode } from './hooks/useDarkMode';
+import { usePolling } from './hooks/usePolling';
+import { useRuntimeLogs } from './hooks/useRuntimeLogs';
+import { formatErrorLog } from './utils/formatErrorLog';
 import { Moon, Sun, Loader2 } from 'lucide-react';
 
 function App() {
@@ -20,12 +24,9 @@ function App() {
     warnings: false,
     failedRequests: false,
   });
-  const [isDarkMode, setIsDarkMode] = useState(false);
-  const [isPolling, setIsPolling] = useState(false);
-  const [runtimeLogs, setRuntimeLogs] = useState([]);
-
-  const pollingUrlRef = useRef(null);
-  const pollingIntervalRef = useRef(null);
+  const { isDarkMode, toggleDarkMode } = useDarkMode();
+  const { isPolling, startPolling, stopPolling, pollingUrl } = usePolling(analyze);
+  const { logs: runtimeLogs, log } = useRuntimeLogs();
 
   const { filteredLogs, filteredRequests, warning } = useFilteredLogs(
     result,
@@ -37,38 +38,17 @@ function App() {
   const hasData = filteredLogs.length > 0 || filteredRequests.length > 0;
 
   useEffect(() => {
-    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-    setIsDarkMode(prefersDark);
-  }, []);
-
-  useEffect(() => {
-    document.documentElement.classList.toggle('dark', isDarkMode);
-  }, [isDarkMode]);
-
-  // Add error handler for failed resource loads
-  useEffect(() => {
     const handleError = (event) => {
-      if (event.filename) {
-        setRuntimeLogs(prev => [...prev, {
-          timestamp: new Date().toISOString(),
-          message: `Failed to load resource: ${event.filename} (Error: ${event.message})`,
-        }]);
-      } else if (error) {
-        setRuntimeLogs(prev => [...prev, {
-          timestamp: new Date().toISOString(),
-          message: `Analysis error: ${error.message || 'Unknown error'}`,
-        }]);
-      }
+      log(formatErrorLog(event));
+      if (error) log(formatErrorLog({ message: error.message || 'Unknown error' }));
     };
 
     window.addEventListener('error', handleError);
     return () => window.removeEventListener('error', handleError);
-  }, [error]);
-
-  const toggleDarkMode = useCallback(() => setIsDarkMode(prev => !prev), []);
+  }, [error, log]);
 
   const handleToggleFilter = useCallback(
-    filterName => {
+    (filterName) => {
       setToggleFilters(prev => ({ ...prev, [filterName]: !prev[filterName] }));
     },
     []
@@ -80,70 +60,36 @@ function App() {
     setToggleFilters({ errors: false, warnings: false, failedRequests: false });
   }, []);
 
-  const startPolling = useCallback((url, options = {}, interval = 60000) => {
-    pollingUrlRef.current = url;
-    pollingIntervalRef.current = setInterval(() => {
-      analyze(url, options);
-    }, interval);
-    setIsPolling(true);
-  }, [analyze]);
-
-  const stopPolling = useCallback(() => {
-    clearInterval(pollingIntervalRef.current);
-    pollingIntervalRef.current = null;
-    setIsPolling(false);
-  }, []);
-
-  useEffect(() => {
-    return () => stopPolling();
-  }, [stopPolling]);
-
   const handleAnalyze = useCallback((normalizedUrl) => {
-    setRuntimeLogs(prev => [...prev, {
-      timestamp: new Date().toISOString(),
-      message: `Analyzing URL: ${normalizedUrl}`,
-    }]);
-    pollingUrlRef.current = normalizedUrl;
+    log(`Analyzing URL: ${normalizedUrl}`);
     if (isPolling) {
       stopPolling();
       startPolling(normalizedUrl);
     } else {
-      analyze(normalUrl);
+      analyze(normalizedUrl);
     }
-  }, [analyze, isPolling, startPolling, stopPolling]);
+  }, [analyze, isPolling, startPolling, stopPolling, log]);
 
   useEffect(() => {
     if (result) {
-      setRuntimeLogs(prev => [...prev, {
-        timestamp: new Date().toISOString(),
-        message: `Analysis Result: ${result.logs.length} logs, ${result.requests.length} requests`,
-      }]);
+      log(`Analysis Result: ${result.logs.length} logs, ${result.requests.length} requests`);
     }
-  }, [result]);
+  }, [result, log]);
 
   useEffect(() => {
     if (filteredLogs.length > 0 || filteredRequests.length > 0) {
-      setRuntimeLogs(prev => [...prev, {
-        timestamp: new Date().toISOString(),
-        message: `Filtered Data: ${filteredLogs.length} logs, ${filteredRequests.length} requests`,
-      }]);
+      log(`Filtered Data: ${filteredLogs.length} logs, ${filteredRequests.length} requests`);
     }
-  }, [filteredLogs, filteredRequests]);
+  }, [filteredLogs, filteredRequests, log]);
 
   return (
     <div className="min-h-screen bg-red-200 dark:bg-blue-200 text-gray-800 dark:text-gray-900 flex flex-col font-sans">
       <header className="p-4 flex justify-between items-center border-b border-gray-300 dark:border-gray-700 sticky top-0 bg-gray-100 dark:bg-gray-800 z-10">
         <h1 className="text-2xl font-bold">DevTools Checker</h1>
         <div className="flex items-center gap-3">
-          {pollingUrlRef.current && (
+          {pollingUrl && (
             <button
-              onClick={() => {
-                if (isPolling) {
-                  stopPolling();
-                } else {
-                  startPolling(pollingUrlRef.current);
-                }
-              }}
+              onClick={() => (isPolling ? stopPolling() : startPolling(pollingUrl))}
               className="text-sm px-3 py-1 rounded bg-blue-500 text-white hover:bg-blue-600 transition"
             >
               {isPolling ? 'Stop Polling' : 'Start Polling'}
@@ -180,18 +126,21 @@ function App() {
             <nav className="flex gap-4 mb-4">
               <Tab
                 label="Console"
-                active={activeTab === 'console'}
+                isActive={activeTab === 'console'}
                 onClick={() => setActiveTab('console')}
+                count={filteredLogs.length}
               />
               <Tab
                 label="Network"
-                active={activeTab === 'network'}
+                isActive={activeTab === 'network'}
                 onClick={() => setActiveTab('network')}
+                count={filteredRequests.length}
               />
               <Tab
                 label="Logs"
-                active={activeTab === 'logs'}
+                isActive={activeTab === 'logs'}
                 onClick={() => setActiveTab('logs')}
+                count={runtimeLogs.length}
               />
             </nav>
 
