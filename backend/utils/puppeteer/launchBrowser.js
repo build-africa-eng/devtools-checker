@@ -9,8 +9,9 @@ const {
   BLOCKED_HOSTS,
 } = require('./constants');
 const logger = require('../logger');
+const path = require('path');
+const fs = require('fs');
 
-// Apply plugins
 puppeteer.use(StealthPlugin());
 puppeteer.use(AdblockerPlugin({ blockTrackers: true }));
 
@@ -22,6 +23,7 @@ async function launchBrowserWithRetries({
   debug = false,
   networkProfile = null,
   blockHosts = true,
+  sessionId = Date.now(),
 } = {}) {
   for (let i = 0; i < retries; i++) {
     try {
@@ -32,8 +34,10 @@ async function launchBrowserWithRetries({
       });
 
       const page = await browser.newPage();
+      const sessionDir = path.join(__dirname, '../../sessions', String(sessionId));
+      fs.mkdirSync(sessionDir, { recursive: true });
 
-      // Determine what to emulate
+      // ========== DEVICE/UA EMULATION ==========
       if (customDevice) {
         await page.emulate(customDevice);
         if (debug) logger.info(`Using custom device profile`);
@@ -43,32 +47,70 @@ async function launchBrowserWithRetries({
       } else if (userAgent && DESKTOP_USER_AGENTS[userAgent]) {
         await page.setUserAgent(DESKTOP_USER_AGENTS[userAgent]);
         if (debug) logger.info(`Applied desktop user agent: ${userAgent}`);
-      } else {
-        if (debug) logger.warn('No valid device or userAgent specified. Default settings applied.');
       }
 
-      // Apply network throttling if requested
+      // ========== NETWORK EMULATION ==========
       if (networkProfile && NETWORK_CONDITIONS[networkProfile]) {
         await page.emulateNetworkConditions(NETWORK_CONDITIONS[networkProfile]);
         if (debug) logger.info(`Applied network profile: ${networkProfile}`);
       }
 
-      // Block specific hostnames manually if needed
+      // ========== BLOCK REQUESTS ==========
       if (blockHosts) {
         await page.setRequestInterception(true);
         page.on('request', (req) => {
           const url = req.url();
           if (BLOCKED_HOSTS.some(host => url.includes(host))) {
-            if (debug) logger.info(`Blocked request to: ${url}`);
+            if (debug) logger.info(`Blocked request: ${url}`);
             return req.abort();
           }
           return req.continue();
         });
       }
 
-      return { browser, page };
+      // ========== REQUEST/RESPONSE LOGGING ==========
+      const requests = [];
+      page.on('requestfinished', async (req) => {
+        const res = req.response();
+        const entry = {
+          url: req.url(),
+          method: req.method(),
+          status: res.status(),
+          headers: await res.headers(),
+        };
+        requests.push(entry);
+        if (debug) logger.debug(`REQ ${entry.status} ${entry.method} ${entry.url}`);
+      });
+
+      // ========== JS ERRORS ==========
+      page.on('console', async (msg) => {
+        if (msg.text() === 'JSHandle@error') {
+          const details = await Promise.all(msg.args().map(arg => arg.getProperty('message')));
+          logger.error(`JS Error: ${details.map(d => d?._remoteObject?.value).join(' | ')}`);
+        } else {
+          logger.info(`[${msg.type()}] ${msg.text()}`);
+        }
+      });
+
+      page.on('pageerror', async (err) => {
+        logger.error(`Page error: ${err.message}`);
+        const screenshotPath = path.join(sessionDir, `error-${Date.now()}.png`);
+        await page.screenshot({ path: screenshotPath });
+        logger.error(`Saved screenshot: ${screenshotPath}`);
+      });
+
+      // Optional: Save request log on close
+      page.on('close', () => {
+        fs.writeFileSync(
+          path.join(sessionDir, 'network-log.json'),
+          JSON.stringify(requests, null, 2)
+        );
+      });
+
+      return { browser, page, sessionDir };
+
     } catch (err) {
-      if (debug) logger.warn(`Retrying browser launch (${i + 1}/${retries}): ${err.message}`);
+      logger.warn(`Retry ${i + 1}/${retries} failed: ${err.message}`);
       if (i === retries - 1) throw new Error(`Failed to launch browser: ${err.message}`);
       await new Promise((r) => setTimeout(r, 2000));
     }
