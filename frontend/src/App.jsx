@@ -5,21 +5,13 @@ import ConsoleView from './pages/ConsoleView';
 import NetworkView from './pages/NetworkView';
 import ExportButtons from './components/ExportButtons';
 import FiltersPanel from './components/FiltersPanel';
+import LogPanel from './components/LogPanel'; // New import
 import { useAnalysis } from './hooks/useAnalysis';
 import { useFilteredLogs } from './hooks/useFilteredLogs';
 import { Moon, Sun, Loader2 } from 'lucide-react';
 
 function App() {
   const { analyze, loading, error, result } = useAnalysis();
-  // Log runtime analysis result
-  if (result) {
-    console.log('Runtime Analysis Result:', {
-      logs: result.logs,
-      requests: result.requests,
-      timestamp: new Date().toISOString(),
-    });
-  }
-
   const [activeTab, setActiveTab] = useState('console');
   const [logFilter, setLogFilter] = useState('all');
   const [requestFilter, setRequestFilter] = useState('all');
@@ -30,6 +22,7 @@ function App() {
   });
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [isPolling, setIsPolling] = useState(false);
+  const [runtimeLogs, setRuntimeLogs] = useState([]); // New state for runtime logs
 
   const pollingUrlRef = useRef(null);
   const pollingIntervalRef = useRef(null);
@@ -40,18 +33,6 @@ function App() {
     logFilter,
     requestFilter
   );
-  // Log runtime filtered logs and requests
-  useEffect(() => {
-    if (filteredLogs.length > 0 || filteredRequests.length > 0) {
-      console.log('Runtime Filtered Data:', {
-        filteredLogs: filteredLogs.length,
-        filteredRequests: filteredRequests.length,
-        sampleLog: filteredLogs[0],
-        sampleRequest: filteredRequests[0],
-        timestamp: new Date().toISOString(),
-      });
-    }
-  }, [filteredLogs, filteredRequests]);
 
   const hasData = filteredLogs.length > 0 || filteredRequests.length > 0;
 
@@ -98,7 +79,10 @@ function App() {
   }, [stopPolling]);
 
   const handleAnalyze = useCallback((normalizedUrl) => {
-    console.log('Runtime Analyze Triggered for URL:', normalizedUrl, 'at', new Date().toISOString());
+    setRuntimeLogs(prev => [...prev, {
+      timestamp: new Date().toISOString(),
+      message: `Analyzing URL: ${normalizedUrl}`,
+    }]);
     pollingUrlRef.current = normalizedUrl;
     if (isPolling) {
       stopPolling();
@@ -107,6 +91,26 @@ function App() {
       analyze(normalizedUrl);
     }
   }, [analyze, isPolling, startPolling, stopPolling]);
+
+  // Update runtime logs with analysis results
+  useEffect(() => {
+    if (result) {
+      setRuntimeLogs(prev => [...prev, {
+        timestamp: new Date().toISOString(),
+        message: `Analysis Result: ${result.logs.length} logs, ${result.requests.length} requests`,
+      }]);
+    }
+  }, [result]);
+
+  // Update runtime logs with filtered data
+  useEffect(() => {
+    if (filteredLogs.length > 0 || filteredRequests.length > 0) {
+      setRuntimeLogs(prev => [...prev, {
+        timestamp: new Date().toISOString(),
+        message: `Filtered Data: ${filteredLogs.length} logs, ${filteredRequests.length} requests`,
+      }]);
+    }
+  }, [filteredLogs, filteredRequests]);
 
   return (
     <div className="min-h-screen bg-red-500 dark:bg-blue-500 text-gray-900 dark:text-gray-100 flex flex-col font-sans">
@@ -166,6 +170,11 @@ function App() {
                 active={activeTab === 'network'}
                 onClick={() => setActiveTab('network')}
               />
+              <Tab
+                label="Logs"
+                active={activeTab === 'logs'}
+                onClick={() => setActiveTab('logs')}
+              /> {/* New Logs tab */}
             </nav>
 
             <FiltersPanel
@@ -182,6 +191,7 @@ function App() {
 
             {activeTab === 'console' && <ConsoleView logs={filteredLogs} />}
             {activeTab === 'network' && <NetworkView requests={filteredRequests} />}
+            {activeTab === 'logs' && <LogPanel logs={runtimeLogs} />} {/* New LogPanel */}
           </>
         )}
       </main>
