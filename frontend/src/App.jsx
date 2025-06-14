@@ -6,8 +6,8 @@ import NetworkView from './pages/NetworkView';
 import ExportButtons from './components/ExportButtons';
 import FiltersPanel from './components/FiltersPanel';
 import LogPanel from './components/LogPanel';
-import DomView from './components/DomView'; // Assuming this is created
-import PerformanceView from './components/PerformanceView'; // New component for performance
+import DomView from './components/DomView';
+import PerformanceView from './components/PerformanceView';
 import { useAnalysis } from './hooks/useAnalysis';
 import { useFilteredLogs } from './hooks/useFilteredLogs';
 import { useDarkMode } from './hooks/useDarkMode';
@@ -27,7 +27,7 @@ function App() {
     failedRequests: false,
   });
   const { isDarkMode, toggleDarkMode } = useDarkMode();
-  const { isPolling, pollingUrl } = usePolling(analyze); // Simplified usage
+  const { isPolling, pollingUrl } = usePolling(analyze);
   const { logs: runtimeLogs, log } = useRuntimeLogs();
 
   const { filteredLogs, filteredRequests, warning } = useFilteredLogs(
@@ -153,13 +153,19 @@ function App() {
               <Tab
                 label="DOM"
                 isActive={activeTab === 'dom'}
-                onClick={() => setActiveTab('dom')}
+                onClick={() => {
+                  analyze(pollingUrl || ''); // Trigger analysis for DOM data
+                  setActiveTab('dom');
+                }}
                 count={result?.html ? 1 : 0}
               />
               <Tab
                 label="Performance"
                 isActive={activeTab === 'performance'}
-                onClick={() => setActiveTab('performance')}
+                onClick={() => {
+                  analyze(pollingUrl || ''); // Trigger analysis for performance data
+                  setActiveTab('performance');
+                }}
                 count={result?.performance?.load > 0 ? 1 : 0}
               />
             </nav>
