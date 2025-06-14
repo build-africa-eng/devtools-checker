@@ -1,4 +1,3 @@
-// backend/utils/puppeteer/LaunchBrowser.js
 const puppeteer = require('puppeteer-extra');
 const StealthPlugin = require('puppeteer-extra-plugin-stealth');
 const AdblockerPlugin = require('puppeteer-extra-plugin-adblocker');
@@ -9,71 +8,197 @@ const {
   NETWORK_CONDITIONS,
   BLOCKED_HOSTS,
 } = require('./constants');
+const { launchBrowserWithRetries } = require('./LaunchBrowser');
+const WebSocket = require('ws');
+const fs = require('fs').promises;
+const isValidUrl = require('../isValidUrl');
 const logger = require('../logger');
+const {
+  setupLogging,
+  setupNetworkCapture,
+  setupTracing,
+  captureTouchAndGestureEvents,
+  captureHtml,
+  captureScreenshot,
+  captureMobileMetrics,
+  inspectElement,
+  executeScript,
+  runLighthouse,
+  runAccessibility,
+} = require('./helpers');
 
 // Apply plugins
 puppeteer.use(StealthPlugin());
 puppeteer.use(AdblockerPlugin({ blockTrackers: true }));
 
-async function launchBrowserWithRetries({
-  retries = 3,
-  device = null,              // e.g., 'iPhone 12'
-  userAgent = null,           // e.g., 'Windows Chrome'
-  customDevice = null,        // manually passed emulate profile
-  debug = false,
-  networkProfile = null,
-  blockHosts = true,
-} = {}) {
-  for (let i = 0; i < retries; i++) {
-    try {
-      const browser = await puppeteer.launch({
-        headless: 'new',
-        args: LAUNCH_ARGS,
-        executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
-      });
+async function analyzeUrl(url, options = {}) {
+  let browser, page, wsServer;
+  const result = {};
 
-      const page = await browser.newPage();
+  try {
+    if (!isValidUrl(url)) throw new Error('Invalid URL');
 
-      // Determine what to emulate
-      if (customDevice) {
-        await page.emulate(customDevice);
-        if (debug) logger.info(`Using custom device profile`);
-      } else if (device && MOBILE_DEVICES[device]) {
-        await page.emulate(MOBILE_DEVICES[device]);
-        if (debug) logger.info(`Emulated mobile device: ${device}`);
-      } else if (userAgent && DESKTOP_USER_AGENTS[userAgent]) {
-        await page.setUserAgent(DESKTOP_USER_AGENTS[userAgent]);
-        if (debug) logger.info(`Applied desktop user agent: ${userAgent}`);
-      } else {
-        if (debug) logger.warn('No valid device or userAgent specified. Default settings applied.');
-      }
+    const {
+      device = 'iPhone 12',
+      customDevice = null,
+      includeHtml = false,
+      includeScreenshot = false,
+      includeLighthouse = false,
+      includeAccessibility = false,
+      includePerformanceTrace = false,
+      captureStacks = true,
+      captureHeaders = false,
+      captureResponseBodies = false,
+      maxBodySize = 10240,
+      maxLogs = 200,
+      maxRequests = 500,
+      onlyImportantLogs = false,
+      navigationTimeout = 30000,
+      networkConditionsType = 'Fast 4G',
+      inspectElement: inspectSelector = null,
+      filterRequestTypes = ['document', 'xhr', 'fetch', 'script'],
+      filterDomains = [],
+      executeScript: scriptToRun = null,
+      debug = false,
+      enableWebSocket = false,
+      cpuThrottlingRate = 1,
+      followLinks = false,
+      maxLinks = 5,
+      requestTimeout = 10000,
+      outputDir = './analysis',
+    } = options;
 
-      // Apply network throttling if requested
-      if (networkProfile && NETWORK_CONDITIONS[networkProfile]) {
-        await page.emulateNetworkConditions(NETWORK_CONDITIONS[networkProfile]);
-        if (debug) logger.info(`Applied network profile: ${networkProfile}`);
-      }
+    await fs.mkdir(outputDir, { recursive: true });
 
-      // Block specific hostnames manually if needed
-      if (blockHosts) {
-        await page.setRequestInterception(true);
-        page.on('request', (req) => {
-          const url = req.url();
-          if (BLOCKED_HOSTS.some(host => url.includes(host))) {
-            if (debug) logger.info(`Blocked request to: ${url}`);
-            return req.abort();
+    // WebSocket integration - disable in production
+    let webSocketUrl = null;
+    if (enableWebSocket && process.env.NODE_ENV !== 'production') {
+      wsServer = new WebSocket.Server({ port: 8081 });
+      webSocketUrl = 'ws://localhost:8081';
+      wsServer.on('connection', (ws) => {
+        if (debug) logger.info('WebSocket client connected');
+        ws.on('message', async (msg) => {
+          try {
+            const { action, data } = JSON.parse(msg);
+            if (action === 'click' && data.selector) {
+              await page.click(data.selector);
+              ws.send(JSON.stringify({ status: 'Clicked', selector: data.selector }));
+            } else if (action === 'reload') {
+              await page.reload();
+              ws.send(JSON.stringify({ status: 'Reloaded' }));
+            }
+          } catch (err) {
+            ws.send(JSON.stringify({ error: err.message }));
           }
-          return req.continue();
         });
-      }
+      });
+    }
 
-      return { browser, page };
-    } catch (err) {
-      if (debug) logger.warn(`Retrying browser launch (${i + 1}/${retries}): ${err.message}`);
-      if (i === retries - 1) throw new Error(`Failed to launch browser: ${err.message}`);
-      await new Promise((r) => setTimeout(r, 2000));
+    const launchOptions = {
+      retries: 3,
+      device,
+      customDevice,
+      debug,
+      networkProfile: networkConditionsType,
+      blockHosts: true,
+    };
+    ({ browser, page } = await launchBrowserWithRetries(launchOptions));
+    await page.setBypassCSP(true);
+
+    const touchEvents = [];
+    const gestureEvents = [];
+    await captureTouchAndGestureEvents(page);
+
+    const logs = setupLogging(page, {
+      maxLogs,
+      onlyImportantLogs,
+      captureStacks,
+      debug,
+      enableWebSocket,
+    }, touchEvents, gestureEvents, wsServer);
+
+    const { requests, networkWaterfall } = await setupNetworkCapture(page, {
+      captureHeaders,
+      captureResponseBodies,
+      maxBodySize,
+      maxRequests,
+      filterRequestTypes,
+      filterDomains,
+      requestTimeout,
+      outputDir,
+      enableWebSocket,
+    }, wsServer);
+
+    let stopTracing;
+    if (includePerformanceTrace) {
+      stopTracing = await setupTracing(page, outputDir, debug);
+    }
+
+    const startTime = Date.now();
+    await page.goto(url, { waitUntil: 'networkidle2', timeout: navigationTimeout });
+    const loadTime = Date.now() - startTime;
+
+    if (includePerformanceTrace && stopTracing) {
+      result.performanceTrace = await stopTracing();
+    }
+
+    result.title = await page.title();
+    result.loadTime = loadTime;
+    result.logs = logs;
+    result.requests = requests;
+    result.touchEvents = touchEvents;
+    result.gestureEvents = gestureEvents;
+    result.networkWaterfall = networkWaterfall();
+    result.mobileMetrics = await captureMobileMetrics(page, debug);
+
+    result.summary = {
+      errors: logs.filter(l => l.level === 'PAGE_ERROR').length,
+      warnings: logs.filter(l => l.level === 'warning').length,
+      requests: requests.length,
+      loadTime,
+    };
+
+    if (includeHtml) result.html = await captureHtml(page, debug);
+    if (includeScreenshot) result.screenshot = await captureScreenshot(page, outputDir, debug);
+    if (includeLighthouse) result.lighthouse = await runLighthouse(page, browser, debug);
+    if (includeAccessibility) result.accessibility = await runAccessibility(page, debug);
+    if (inspectSelector) result.element = await inspectElement(page, inspectSelector, debug);
+    if (scriptToRun) result.scriptResult = await executeScript(page, scriptToRun, debug);
+
+    if (followLinks) {
+      const links = await page.$$eval('a', as =>
+        as.map(a => a.href).filter(href => href.startsWith('http'))
+      );
+      result.relatedPages = await Promise.all(
+        [...new Set(links)].slice(0, maxLinks).map(link =>
+          analyzeUrl(link, { ...options, followLinks: false }).catch(err => ({
+            url: link,
+            error: err.message,
+          }))
+        )
+      );
+    }
+
+    if (enableWebSocket && webSocketUrl) {
+      result.webSocket = { url: webSocketUrl, actions: ['click', 'reload'] };
+    }
+
+    return result;
+
+  } catch (err) {
+    logger.error(`Analysis failed: ${err.message}`);
+    return { error: err.message };
+  } finally {
+    if (wsServer) wsServer.close();
+    if (browser) {
+      try {
+        await browser.close();
+        if (options.debug) logger.info('Browser closed');
+      } catch (err) {
+        if (options.debug) logger.warn(`Error closing browser: ${err.message}`);
+      }
     }
   }
 }
 
-module.exports = { launchBrowserWithRetries };
+module.exports = analyzeUrl;
