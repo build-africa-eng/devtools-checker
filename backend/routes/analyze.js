@@ -8,7 +8,6 @@ const logger = require('../utils/logger');
 const router = express.Router();
 const cache = new NodeCache({ stdTTL: 600, checkperiod: 120 });
 
-// Rate limiter
 const limiter = rateLimit({
   windowMs: 1 * 60 * 1000,
   max: 10,
@@ -19,7 +18,6 @@ const limiter = rateLimit({
   },
 });
 
-// Allowed options
 const allowedOptions = [
   'device', 'customDevice', 'includeHtml', 'includeScreenshot', 'includeLighthouse',
   'includeAccessibility', 'includePerformanceTrace', 'captureStacks', 'captureHeaders',
@@ -43,7 +41,6 @@ function safeJson(obj) {
 router.post('/', limiter, async (req, res) => {
   const { url, options = {} } = req.body;
 
-  // Validate URL
   if (!url || typeof url !== 'string' || !url.trim()) {
     logger.request(req, 'Invalid request: Missing or empty URL', 'warn');
     return res.status(400).json({ error: 'A valid URL is required.' });
@@ -53,7 +50,6 @@ router.post('/', limiter, async (req, res) => {
     return res.status(400).json({ error: 'Invalid URL format. Must start with http or https.' });
   }
 
-  // Validate options
   if (!validateOptions(options)) {
     logger.request(req, `Invalid options: ${JSON.stringify(options)}`, 'warn');
     return res.status(400).json({
@@ -63,7 +59,6 @@ router.post('/', limiter, async (req, res) => {
     });
   }
 
-  // Check cache
   const cacheKey = `${url}:${JSON.stringify(options)}`;
   const cachedResult = cache.get(cacheKey);
   if (cachedResult) {
