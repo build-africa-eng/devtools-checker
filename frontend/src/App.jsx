@@ -83,7 +83,7 @@ function App() {
   }, [filteredLogs, filteredRequests, log]);
 
   return (
-    <div className="min-h-screen bg-green-500 dark:bg-blue-500 text-gray-800 dark:text-gray-900 flex flex-col font-sans">
+    <div className="min-h-screen bg-green-500 dark:bg-blue-500 text-gray-1000 dark:text-gray-1100 flex flex-col font-sans">
       <header className="p-4 flex justify-between items-center border-b border-gray-300 dark:border-gray-700 sticky top-0 bg-gray-100 dark:bg-gray-800 z-10">
         <h1 className="text-2xl font-bold">DevTools Checker</h1>
         <div className="flex items-center gap-3">
