@@ -5,7 +5,7 @@ import ConsoleView from './pages/ConsoleView';
 import NetworkView from './pages/NetworkView';
 import ExportButtons from './components/ExportButtons';
 import FiltersPanel from './components/FiltersPanel';
-import LogPanel from './components/LogPanel'; // New import
+import LogPanel from './components/LogPanel';
 import { useAnalysis } from './hooks/useAnalysis';
 import { useFilteredLogs } from './hooks/useFilteredLogs';
 import { Moon, Sun, Loader2 } from 'lucide-react';
@@ -22,7 +22,7 @@ function App() {
   });
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [isPolling, setIsPolling] = useState(false);
-  const [runtimeLogs, setRuntimeLogs] = useState([]); // New state for runtime logs
+  const [runtimeLogs, setRuntimeLogs] = useState([]);
 
   const pollingUrlRef = useRef(null);
   const pollingIntervalRef = useRef(null);
@@ -44,6 +44,26 @@ function App() {
   useEffect(() => {
     document.documentElement.classList.toggle('dark', isDarkMode);
   }, [isDarkMode]);
+
+  // Add error handler for failed resource loads
+  useEffect(() => {
+    const handleError = (event) => {
+      if (event.filename) {
+        setRuntimeLogs(prev => [...prev, {
+          timestamp: new Date().toISOString(),
+          message: `Failed to load resource: ${event.filename} (Error: ${event.message})`,
+        }]);
+      } else if (error) {
+        setRuntimeLogs(prev => [...prev, {
+          timestamp: new Date().toISOString(),
+          message: `Analysis error: ${error.message || 'Unknown error'}`,
+        }]);
+      }
+    };
+
+    window.addEventListener('error', handleError);
+    return () => window.removeEventListener('error', handleError);
+  }, [error]);
 
   const toggleDarkMode = useCallback(() => setIsDarkMode(prev => !prev), []);
 
@@ -92,7 +112,6 @@ function App() {
     }
   }, [analyze, isPolling, startPolling, stopPolling]);
 
-  // Update runtime logs with analysis results
   useEffect(() => {
     if (result) {
       setRuntimeLogs(prev => [...prev, {
@@ -102,7 +121,6 @@ function App() {
     }
   }, [result]);
 
-  // Update runtime logs with filtered data
   useEffect(() => {
     if (filteredLogs.length > 0 || filteredRequests.length > 0) {
       setRuntimeLogs(prev => [...prev, {
@@ -174,7 +192,7 @@ function App() {
                 label="Logs"
                 active={activeTab === 'logs'}
                 onClick={() => setActiveTab('logs')}
-              /> {/* New Logs tab */}
+              />
             </nav>
 
             <FiltersPanel
@@ -191,7 +209,7 @@ function App() {
 
             {activeTab === 'console' && <ConsoleView logs={filteredLogs} />}
             {activeTab === 'network' && <NetworkView requests={filteredRequests} />}
-            {activeTab === 'logs' && <LogPanel logs={runtimeLogs} />} {/* New LogPanel */}
+            {activeTab === 'logs' && <LogPanel logs={runtimeLogs} />}
           </>
         )}
       </main>
