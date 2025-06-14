@@ -11,6 +11,15 @@ import { Moon, Sun, Loader2 } from 'lucide-react';
 
 function App() {
   const { analyze, loading, error, result } = useAnalysis();
+  // Log runtime analysis result
+  if (result) {
+    console.log('Runtime Analysis Result:', {
+      logs: result.logs,
+      requests: result.requests,
+      timestamp: new Date().toISOString(),
+    });
+  }
+
   const [activeTab, setActiveTab] = useState('console');
   const [logFilter, setLogFilter] = useState('all');
   const [requestFilter, setRequestFilter] = useState('all');
@@ -31,6 +40,18 @@ function App() {
     logFilter,
     requestFilter
   );
+  // Log runtime filtered logs and requests
+  useEffect(() => {
+    if (filteredLogs.length > 0 || filteredRequests.length > 0) {
+      console.log('Runtime Filtered Data:', {
+        filteredLogs: filteredLogs.length,
+        filteredRequests: filteredRequests.length,
+        sampleLog: filteredLogs[0],
+        sampleRequest: filteredRequests[0],
+        timestamp: new Date().toISOString(),
+      });
+    }
+  }, [filteredLogs, filteredRequests]);
 
   const hasData = filteredLogs.length > 0 || filteredRequests.length > 0;
 
@@ -73,10 +94,11 @@ function App() {
   }, []);
 
   useEffect(() => {
-    return () => stopPolling(); // cleanup on unmount
+    return () => stopPolling();
   }, [stopPolling]);
 
   const handleAnalyze = useCallback((normalizedUrl) => {
+    console.log('Runtime Analyze Triggered for URL:', normalizedUrl, 'at', new Date().toISOString());
     pollingUrlRef.current = normalizedUrl;
     if (isPolling) {
       stopPolling();
