@@ -2,7 +2,13 @@
 const puppeteer = require('puppeteer-extra');
 const StealthPlugin = require('puppeteer-extra-plugin-stealth');
 const AdblockerPlugin = require('puppeteer-extra-plugin-adblocker');
-const { LAUNCH_ARGS, MOBILE_DEVICES, NETWORK_CONDITIONS, BLOCKED_HOSTS } = require('./constants');
+const {
+  LAUNCH_ARGS,
+  MOBILE_DEVICES,
+  DESKTOP_USER_AGENTS,
+  NETWORK_CONDITIONS,
+  BLOCKED_HOSTS,
+} = require('./constants');
 const logger = require('../logger');
 
 // Apply plugins
@@ -11,8 +17,9 @@ puppeteer.use(AdblockerPlugin({ blockTrackers: true }));
 
 async function launchBrowserWithRetries({
   retries = 3,
-  device = 'iPhone 12',
-  customDevice = null,
+  device = null,              // e.g., 'iPhone 12'
+  userAgent = null,           // e.g., 'Windows Chrome'
+  customDevice = null,        // manually passed emulate profile
   debug = false,
   networkProfile = null,
   blockHosts = true,
@@ -27,9 +34,19 @@ async function launchBrowserWithRetries({
 
       const page = await browser.newPage();
 
-      // Emulate mobile device
-      const deviceProfile = customDevice || MOBILE_DEVICES[device] || MOBILE_DEVICES['iPhone 12'];
-      await page.emulate(deviceProfile);
+      // Determine what to emulate
+      if (customDevice) {
+        await page.emulate(customDevice);
+        if (debug) logger.info(`Using custom device profile`);
+      } else if (device && MOBILE_DEVICES[device]) {
+        await page.emulate(MOBILE_DEVICES[device]);
+        if (debug) logger.info(`Emulated mobile device: ${device}`);
+      } else if (userAgent && DESKTOP_USER_AGENTS[userAgent]) {
+        await page.setUserAgent(DESKTOP_USER_AGENTS[userAgent]);
+        if (debug) logger.info(`Applied desktop user agent: ${userAgent}`);
+      } else {
+        if (debug) logger.warn('No valid device or userAgent specified. Default settings applied.');
+      }
 
       // Apply network throttling if requested
       if (networkProfile && NETWORK_CONDITIONS[networkProfile]) {
@@ -50,7 +67,6 @@ async function launchBrowserWithRetries({
         });
       }
 
-      if (debug) logger.info(`Launched browser with ${deviceProfile.name || device}`);
       return { browser, page };
     } catch (err) {
       if (debug) logger.warn(`Retrying browser launch (${i + 1}/${retries}): ${err.message}`);
