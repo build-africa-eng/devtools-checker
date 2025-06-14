@@ -84,11 +84,26 @@ async function launchBrowserWithRetries({
 
       // ========== JS ERRORS ==========
       page.on('console', async (msg) => {
-        if (msg.text() === 'JSHandle@error') {
-          const details = await Promise.all(msg.args().map(arg => arg.getProperty('message')));
-          logger.error(`JS Error: ${details.map(d => d?._remoteObject?.value).join(' | ')}`);
+        const type = msg.type();
+        const args = msg.args();
+
+        const texts = await Promise.all(
+          args.map(async (arg) => {
+            try {
+              const val = await arg.jsonValue();
+              return typeof val === 'object' ? JSON.stringify(val) : String(val);
+            } catch (err) {
+              return '[unserializable]';
+            }
+          })
+        );
+
+        const fullMsg = texts.join(' | ');
+
+        if (type === 'error') {
+          logger.error(`Console error: ${fullMsg}`);
         } else {
-          logger.info(`[${msg.type()}] ${msg.text()}`);
+          logger.info(`[${type}] ${fullMsg}`);
         }
       });
 
