@@ -11,8 +11,9 @@ const {
   captureHtml,
   captureScreenshot,
   captureMobileMetrics,
+  getDomMetrics, // Updated import
   inspectElement,
-  executeScript
+  executeScript,
 } = require('./helpers');
 const WebSocket = require('ws');
 const fs = require('fs').promises;
@@ -105,7 +106,7 @@ async function analyzeUrl(url, options = {}) {
       onlyImportantLogs,
       captureStacks,
       debug,
-      enableWebSocket
+      enableWebSocket,
     }, touchEvents, gestureEvents, wsServer);
 
     const { requests, networkWaterfall } = await setupNetworkCapture(page, {
@@ -117,7 +118,7 @@ async function analyzeUrl(url, options = {}) {
       filterDomains,
       requestTimeout,
       outputDir,
-      enableWebSocket
+      enableWebSocket,
     }, wsServer);
 
     let stopTracing;
@@ -133,6 +134,10 @@ async function analyzeUrl(url, options = {}) {
       result.performanceTrace = await stopTracing();
     }
 
+    // Additional performance metrics
+    const performanceMetrics = await page.metrics();
+    const domMetrics = await getDomMetrics(page, debug);
+
     result.title = await page.title();
     result.loadTime = loadTime;
     result.logs = logs;
@@ -141,12 +146,19 @@ async function analyzeUrl(url, options = {}) {
     result.gestureEvents = gestureEvents;
     result.networkWaterfall = networkWaterfall();
     result.mobileMetrics = await captureMobileMetrics(page, debug);
+    result.performanceMetrics = {
+      timestamp: new Date().toISOString(),
+      ...performanceMetrics,
+      domContentLoaded: performanceMetrics.DOMContentLoaded || 0,
+      firstPaint: performanceMetrics.FirstPaint || 0,
+    };
+    result.domMetrics = domMetrics;
 
     result.summary = {
       errors: logs.filter(l => l.level === 'PAGE_ERROR').length,
       warnings: logs.filter(l => l.level === 'warning').length,
       requests: requests.length,
-      loadTime
+      loadTime,
     };
 
     if (includeHtml) result.html = await captureHtml(page, debug);
@@ -164,7 +176,7 @@ async function analyzeUrl(url, options = {}) {
         [...new Set(links)].slice(0, maxLinks).map(link =>
           analyzeUrl(link, { ...options, followLinks: false }).catch(err => ({
             url: link,
-            error: err.message
+            error: err.message,
           }))
         )
       );
