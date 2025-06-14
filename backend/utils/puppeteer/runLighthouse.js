@@ -1,4 +1,3 @@
-// backend/utils/puppeteer/RunLighthouse.js
 const lighthouse = require('lighthouse');
 const { URL } = require('url');
 const logger = require('../logger');
@@ -12,12 +11,21 @@ const logger = require('../logger');
  */
 async function runLighthouse(page, browser, debug = false) {
   try {
+    // Check if page and browser are valid
+    if (!page || !browser) throw new Error('Invalid page or browser instance');
+
     const endpointURL = new URL(browser.wsEndpoint());
-    const { lhr } = await lighthouse(page.url(), {
-      port: endpointURL.port,
-      output: 'json',
-      logLevel: debug ? 'info' : 'error',
-    });
+    const { lhr } = await Promise.race([
+      lighthouse(page.url(), {
+        port: endpointURL.port,
+        output: 'json',
+        logLevel: debug ? 'info' : 'error',
+        timeout: 30000, // Add timeout to prevent hanging
+      }),
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Lighthouse audit timed out')), 30000)
+      ),
+    ]);
 
     if (debug) logger.info('Lighthouse audit completed');
     return {
