@@ -51,6 +51,11 @@ async function launchBrowserWithRetries({
       const page = await browser.newPage();
       const sessionDir = path.join(__dirname, '../../sessions', String(sessionId));
       fs.mkdirSync(sessionDir, { recursive: true });
+      
+      // ========== SET VIEWPORT (FIX) ==========
+      // Set a default viewport to prevent "0 width" screenshot errors
+      await page.setViewport({ width: 1280, height: 800 });
+
 
       // ========== DEVICE/UA EMULATION ==========
       if (customDevice) {
@@ -104,7 +109,8 @@ async function launchBrowserWithRetries({
         const type = msg.type();
         try {
           const args = await Promise.all(msg.args().map(arg => arg.jsonValue()));
-          let fullMsg = ''; // Corrected variable name from full-Msg
+          // FIX: Renamed full-Msg to fullMsg (removed hyphen)
+          let fullMsg = ''; 
           for (const arg of args) {
             if (typeof arg === 'object' && arg !== null) {
               // Stringify objects/errors to get a meaningful message
