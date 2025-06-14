@@ -1,4 +1,3 @@
-// backend/utils/puppeteer/RunAccessibility.js
 const { AxePuppeteer } = require('@axe-core/puppeteer');
 const logger = require('../logger');
 
@@ -10,8 +9,17 @@ const logger = require('../logger');
  */
 async function runAccessibility(page, debug = false) {
   try {
+    // Check if page is valid
+    if (!page) throw new Error('Invalid page instance');
+
     const axe = new AxePuppeteer(page);
-    const results = await axe.analyze();
+    const results = await Promise.race([
+      axe.analyze(),
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Accessibility audit timed out')), 30000)
+      ),
+    ]);
+
     if (debug) logger.info('Accessibility audit completed');
     return results;
   } catch (err) {
