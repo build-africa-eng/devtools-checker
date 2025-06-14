@@ -8,7 +8,8 @@ const PerformanceView = ({ performance }) => {
       const ctx = canvasRef.current.getContext('2d');
       ctx.clearRect(0, 0, 200, 100);
       ctx.fillStyle = 'blue';
-      ctx.fillRect(0, 0, (performance.load / 5000) * 200, 50); // Scale load time (max 5s)
+      const loadScale = Math.min(performance.load / 5000, 1) * 200; // Scale to 5s max
+      ctx.fillRect(0, 0, loadScale, 50);
       ctx.fillStyle = 'green';
       ctx.fillText(`Load: ${performance.load}ms`, 10, 80);
       ctx.fillText(`DOM: ${performance.domContentLoaded}ms`, 10, 90);
