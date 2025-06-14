@@ -25,6 +25,8 @@ const allowedOptions = [
   'navigationTimeout', 'networkConditionsType', 'inspectElement', 'filterRequestTypes',
   'filterDomains', 'executeScript', 'debug', 'enableWebSocket', 'cpuThrottlingRate',
   'followLinks', 'maxLinks', 'requestTimeout', 'outputDir',
+  // Add new options for DOM and performance
+  'includeDomMetrics', 'includePerformanceMetrics',
 ];
 
 function validateOptions(options) {
@@ -69,7 +71,15 @@ router.post('/', limiter, async (req, res) => {
   try {
     logger.request(req, `Analysis started: ${url}`, 'info', { options });
 
-    const analysisPromise = analyzeUrl(url, { ...options, debug: options.debug || true });
+    // Default to including DOM and performance metrics
+    const analysisOptions = {
+      ...options,
+      includeDomMetrics: options.includeDomMetrics !== false, // Default to true
+      includePerformanceMetrics: options.includePerformanceMetrics !== false, // Default to true
+      debug: options.debug || true,
+    };
+
+    const analysisPromise = analyzeUrl(url, analysisOptions);
     const timeoutPromise = new Promise((_, reject) =>
       setTimeout(() => reject(new Error('Analysis timed out')), 60000)
     );
@@ -84,14 +94,24 @@ router.post('/', limiter, async (req, res) => {
       });
     }
 
-    cache.set(cacheKey, analysisData);
+    // Ensure response matches frontend expectations
+    const responseData = {
+      title: analysisData.title || 'Untitled Page',
+      html: analysisData.html || '',
+      screenshot: analysisData.screenshot || '',
+      logs: Array.isArray(analysisData.logs) ? analysisData.logs : [],
+      requests: Array.isArray(analysisData.requests) ? analysisData.requests : [],
+      performance: analysisData.performance || { domContentLoaded: -1, load: -1, firstPaint: -1, largestContentfulPaint: -1 },
+      domMetrics: analysisData.domMetrics || {},
+      warning: analysisData.warning || null,
+      webSocket: analysisData.webSocket || (analysisOptions.enableWebSocket ? { url: 'ws://localhost:8081', actions: ['click', 'reload'] } : null),
+      summary: analysisData.summary || { errors: 0, warnings: 0, requests: 0, loadTime: 0 },
+    };
+
+    cache.set(cacheKey, responseData);
     logger.request(req, `Analysis completed: ${url}`, 'info');
 
-    if (options.enableWebSocket) {
-      analysisData.webSocket = { url: 'ws://localhost:8081', actions: ['click', 'reload'] };
-    }
-
-    return res.json(safeJson(analysisData));
+    return res.json(safeJson(responseData));
   } catch (error) {
     logger.request(req, `Unexpected error: ${url} | ${error.stack || error.message}`, 'error');
     return res.status(500).json({
@@ -111,7 +131,7 @@ router.get('/', limiter, async (req, res) => {
 
   try {
     logger.request(req, `GET analysis started: ${url}`, 'info');
-    const analysisData = await analyzeUrl(url, { debug: true });
+    const analysisData = await analyzeUrl(url, { debug: true, includeDomMetrics: true, includePerformanceMetrics: true });
     if (analysisData.error) {
       logger.request(req, `GET analysis failed: ${url} | ${analysisData.error}`, 'error');
       return res.status(500).json({
@@ -119,8 +139,22 @@ router.get('/', limiter, async (req, res) => {
         message: analysisData.error,
       });
     }
+
+    const responseData = {
+      title: analysisData.title || 'Untitled Page',
+      html: analysisData.html || '',
+      screenshot: analysisData.screenshot || '',
+      logs: Array.isArray(analysisData.logs) ? analysisData.logs : [],
+      requests: Array.isArray(analysisData.requests) ? analysisData.requests : [],
+      performance: analysisData.performance || { domContentLoaded: -1, load: -1, firstPaint: -1, largestContentfulPaint: -1 },
+      domMetrics: analysisData.domMetrics || {},
+      warning: analysisData.warning || null,
+      webSocket: analysisData.webSocket || { url: 'ws://localhost:8081', actions: ['click', 'reload'] },
+      summary: analysisData.summary || { errors: 0, warnings: 0, requests: 0, loadTime: 0 },
+    };
+
     logger.request(req, `GET analysis completed: ${url}`, 'info');
-    return res.json(safeJson(analysisData));
+    return res.json(safeJson(responseData));
   } catch (error) {
     logger.request(req, `Unexpected GET error: ${url} | ${error.stack || error.message}`, 'error');
     return res.status(500).json({ error: 'Internal server error' });
