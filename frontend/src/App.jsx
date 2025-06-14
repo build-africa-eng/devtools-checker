@@ -131,62 +131,84 @@ function App() {
 
         {hasData && (
           <>
-            <nav className="flex gap-4 mb-4">
-              <Tab
-                label="Console"
-                isActive={activeTab === 'console'}
-                onClick={() => setActiveTab('console')}
-                count={filteredLogs.length}
-              />
-              <Tab
-                label="Network"
-                isActive={activeTab === 'network'}
-                onClick={() => setActiveTab('network')}
-                count={filteredRequests.length}
-              />
-              <Tab
-                label="Logs"
-                isActive={activeTab === 'logs'}
-                onClick={() => setActiveTab('logs')}
-                count={runtimeLogs.length}
-              />
-              <Tab
-                label="DOM"
-                isActive={activeTab === 'dom'}
-                onClick={() => {
-                  analyze(pollingUrl || ''); // Trigger analysis for DOM data
-                  setActiveTab('dom');
-                }}
-                count={result?.html ? 1 : 0}
-              />
-              <Tab
-                label="Performance"
-                isActive={activeTab === 'performance'}
-                onClick={() => {
-                  analyze(pollingUrl || ''); // Trigger analysis for performance data
-                  setActiveTab('performance');
-                }}
-                count={result?.performance?.load > 0 ? 1 : 0}
-              />
-            </nav>
+            <div className="md:flex md:flex-col">
+              <div className="md:flex md:items-center md:justify-between mb-4">
+                <div className="w-full md:w-auto">
+                  <select
+                    value={activeTab}
+                    onChange={(e) => {
+                      const tab = e.target.value;
+                      if (tab === 'dom' || tab === 'performance') analyze(pollingUrl || '');
+                      setActiveTab(tab);
+                    }}
+                    className="w-full md:hidden p-2 bg-gray-100 dark:bg-gray-800 text-black dark:text-white rounded mb-2"
+                  >
+                    <option value="console">Console</option>
+                    <option value="network">Network</option>
+                    <option value="logs">Logs</option>
+                    <option value="dom">DOM</option>
+                    <option value="performance">Performance</option>
+                  </select>
+                  <nav className="hidden md:flex gap-4 mb-4">
+                    <Tab
+                      label="Console"
+                      isActive={activeTab === 'console'}
+                      onClick={() => setActiveTab('console')}
+                      count={filteredLogs.length}
+                    />
+                    <Tab
+                      label="Network"
+                      isActive={activeTab === 'network'}
+                      onClick={() => setActiveTab('network')}
+                      count={filteredRequests.length}
+                    />
+                    <Tab
+                      label="Logs"
+                      isActive={activeTab === 'logs'}
+                      onClick={() => setActiveTab('logs')}
+                      count={runtimeLogs.length}
+                    />
+                    <Tab
+                      label="DOM"
+                      isActive={activeTab === 'dom'}
+                      onClick={() => {
+                        analyze(pollingUrl || '');
+                        setActiveTab('dom');
+                      }}
+                      count={result?.html ? 1 : 0}
+                    />
+                    <Tab
+                      label="Performance"
+                      isActive={activeTab === 'performance'}
+                      onClick={() => {
+                        analyze(pollingUrl || '');
+                        setActiveTab('performance');
+                      }}
+                      count={result?.performance?.load > 0 ? 1 : 0}
+                    />
+                  </nav>
+                </div>
+              </div>
 
-            <FiltersPanel
-              toggleFilters={toggleFilters}
-              logFilter={logFilter}
-              requestFilter={requestFilter}
-              onToggle={handleToggleFilter}
-              onLogFilterChange={setLogFilter}
-              onRequestFilterChange={setRequestFilter}
-              onReset={resetFilters}
-            />
+              <FiltersPanel
+                toggleFilters={toggleFilters}
+                logFilter={logFilter}
+                requestFilter={requestFilter}
+                onToggle={handleToggleFilter}
+                onLogFilterChange={setLogFilter}
+                onRequestFilterChange={setRequestFilter}
+                onReset={resetFilters}
+                className="mb-4"
+              />
 
-            <ExportButtons data={{ logs: filteredLogs, requests: filteredRequests }} />
+              <ExportButtons data={{ logs: filteredLogs, requests: filteredRequests }} />
 
-            {activeTab === 'console' && <ConsoleView logs={filteredLogs} />}
-            {activeTab === 'network' && <NetworkView requests={filteredRequests} />}
-            {activeTab === 'logs' && <LogPanel logs={runtimeLogs} />}
-            {activeTab === 'dom' && <DomView html={result?.html} css={result?.css || []} />}
-            {activeTab === 'performance' && <PerformanceView performance={result?.performance} />}
+              {activeTab === 'console' && <ConsoleView logs={filteredLogs} />}
+              {activeTab === 'network' && <NetworkView requests={filteredRequests} />}
+              {activeTab === 'logs' && <LogPanel logs={runtimeLogs} />}
+              {activeTab === 'dom' && <DomView html={result?.html} css={result?.css || []} />}
+              {activeTab === 'performance' && <PerformanceView performance={result?.performance} />}
+            </div>
           </>
         )}
       </main>
