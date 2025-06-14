@@ -1,7 +1,7 @@
 // utils/puppeteer/helper.js
 const fs = require('fs').promises;
 const logger = require('../logger');
-const { compressToBase64 } = require('../compression');
+const { compressToBase64 } = require('./compression');
 
 async function captureTouchAndGestureEvents(page) {
   await page.evaluate(() => {
