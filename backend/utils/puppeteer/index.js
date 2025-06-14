@@ -11,7 +11,7 @@ const {
   captureHtml,
   captureScreenshot,
   captureMobileMetrics,
-  getDomMetrics, // Updated import
+  getDomMetrics,
   inspectElement,
   executeScript,
 } = require('./helpers');
@@ -25,7 +25,6 @@ async function analyzeUrl(url, options = {}) {
   try {
     if (!isValidUrl(url)) throw new Error('Invalid URL');
 
-    // Default options
     const {
       device = 'iPhone 12',
       customDevice = null,
@@ -58,7 +57,6 @@ async function analyzeUrl(url, options = {}) {
 
     await fs.mkdir(outputDir, { recursive: true });
 
-    // WebSocket integration
     let webSocketUrl = null;
     if (enableWebSocket) {
       if (process.env.NODE_ENV === 'production') {
@@ -134,25 +132,24 @@ async function analyzeUrl(url, options = {}) {
       result.performanceTrace = await stopTracing();
     }
 
-    // Additional performance metrics
     const performanceMetrics = await page.metrics();
     const domMetrics = await getDomMetrics(page, debug);
+    const warning = logs.some(l => l.level === 'warning') ? 'Some warnings detected in logs' : null;
 
     result.title = await page.title();
-    result.loadTime = loadTime;
-    result.logs = logs;
-    result.requests = requests;
-    result.touchEvents = touchEvents;
-    result.gestureEvents = gestureEvents;
-    result.networkWaterfall = networkWaterfall();
-    result.mobileMetrics = await captureMobileMetrics(page, debug);
-    result.performanceMetrics = {
-      timestamp: new Date().toISOString(),
-      ...performanceMetrics,
-      domContentLoaded: performanceMetrics.DOMContentLoaded || 0,
-      firstPaint: performanceMetrics.FirstPaint || 0,
+    result.html = includeHtml ? await captureHtml(page, debug) : '';
+    result.screenshot = includeScreenshot ? await captureScreenshot(page, outputDir, debug) : '';
+    result.logs = Array.isArray(logs) ? logs : [];
+    result.requests = Array.isArray(requests) ? requests : [];
+    result.performance = {
+      domContentLoaded: performanceMetrics.DOMContentLoaded || -1,
+      load: loadTime / 1000, // Convert to seconds
+      firstPaint: performanceMetrics.FirstPaint || -1,
+      largestContentfulPaint: performanceMetrics.LargestContentfulPaint || -1,
     };
-    result.domMetrics = domMetrics;
+    result.domMetrics = domMetrics || {};
+    result.warning = warning;
+    result.webSocket = enableWebSocket && webSocketUrl ? { url: webSocketUrl, actions: ['click', 'reload'] } : null;
 
     result.summary = {
       errors: logs.filter(l => l.level === 'PAGE_ERROR').length,
@@ -161,8 +158,6 @@ async function analyzeUrl(url, options = {}) {
       loadTime,
     };
 
-    if (includeHtml) result.html = await captureHtml(page, debug);
-    if (includeScreenshot) result.screenshot = await captureScreenshot(page, outputDir, debug);
     if (includeLighthouse) result.lighthouse = await runLighthouse(page, browser, debug);
     if (includeAccessibility) result.accessibility = await runAccessibility(page, debug);
     if (inspectSelector) result.element = await inspectElement(page, inspectSelector, debug);
@@ -180,10 +175,6 @@ async function analyzeUrl(url, options = {}) {
           }))
         )
       );
-    }
-
-    if (enableWebSocket && webSocketUrl) {
-      result.webSocket = { url: webSocketUrl, actions: ['click', 'reload'] };
     }
 
     return result;
