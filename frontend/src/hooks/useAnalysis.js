@@ -107,7 +107,8 @@ export function useAnalysis() {
           screenshot = '',
           logs = [],
           requests = [],
-          performance = { domContentLoaded: -1, load: -1 },
+          performance = { domContentLoaded: -1, load: -1, firstPaint: -1, largestContentfulPaint: -1 },
+          domMetrics = {},
           warning = null,
           webSocket = null,
         } = data;
@@ -118,14 +119,14 @@ export function useAnalysis() {
           screenshot,
           logs: Array.isArray(logs) ? logs : [],
           requests: Array.isArray(requests) ? requests : [],
-          performance: typeof performance === 'object' ? performance : { domContentLoaded: -1, load: -1 },
+          performance,
+          domMetrics,
           warning,
           webSocket,
         };
 
         setResult(formattedResult);
 
-        // Optional: listen for live updates via WebSocket
         if (webSocket?.url) {
           const socket = new window.WebSocket(webSocket.url);
           wsRef.current = socket;
@@ -141,9 +142,7 @@ export function useAnalysis() {
               }
             } catch {}
           };
-          socket.onerror = () => {
-            // Optionally report WebSocket error to the user
-          };
+          socket.onerror = () => {};
           socket.onclose = () => {
             wsRef.current = null;
           };
@@ -161,12 +160,11 @@ export function useAnalysis() {
           setError(friendlyError(message));
           setResult(null);
           if (import.meta.env.DEV) {
-            // eslint-disable-next-line no-console
             console.error('Analysis error:', { message: err.message, stack: err.stack, url: trimmedUrl, options });
           }
           return null;
         }
-        await new Promise((res) => setTimeout(res, 500 + attempt * 500)); // Backoff
+        await new Promise((res) => setTimeout(res, 500 + attempt * 500));
       } finally {
         setLoading(false);
         setController(null);
@@ -176,7 +174,6 @@ export function useAnalysis() {
     }
   };
 
-  // Optional auto-refresh (polling)
   const startPolling = (url, options = {}, interval = 60000) => {
     stopPolling();
     pollRef.current = setInterval(() => {
