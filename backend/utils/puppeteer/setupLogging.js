@@ -4,6 +4,12 @@ function setupLogging(page, options, touchEvents, gestureEvents, wsServer) {
   const { maxLogs = 200, onlyImportantLogs = false, captureStacks = true, debug = false, enableWebSocket = false } = options;
   const logs = [];
 
+  // Validate page instance
+  if (!page) {
+    if (debug) logger.error('Invalid page instance for logging setup');
+    return logs;
+  }
+
   page.on('console', async (msg) => {
     if (logs.length >= maxLogs) return;
     const level = msg.type();
