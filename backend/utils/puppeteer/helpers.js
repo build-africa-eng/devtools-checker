@@ -1,8 +1,7 @@
-const { promisify } = require('util');
-const zlib = require('zlib');
+// utils/puppeteer/helper.js
 const fs = require('fs').promises;
-const deflate = promisify(zlib.deflate);
 const logger = require('../logger');
+const { compressToBase64 } = require('../compression');
 
 async function captureTouchAndGestureEvents(page) {
   await page.evaluate(() => {
@@ -24,28 +23,28 @@ async function captureTouchAndGestureEvents(page) {
 
 async function captureHtml(page, debug = false) {
   const html = await page.content();
-  const compressed = (await deflate(html)).toString('base64');
-  if (debug) logger.info('Captured and compressed HTML'); // ✅ CORRECT
+  const compressed = await compressToBase64(html);
+  if (debug) logger.info('Captured and compressed HTML');
   return compressed;
 }
 
-async function captureScreenshot(page, outputDir, debug = false) {
+async function captureScreenshot(page, debug = false) {
   const ss = await page.screenshot({ encoding: 'binary', fullPage: true });
-  const compressed = (await deflate(ss)).toString('base64');
-  if (debug) logger.info('Captured and compressed screenshot'); // ✅ CORRECT
+  const compressed = await compressToBase64(ss);
+  if (debug) logger.info('Captured and compressed screenshot');
   return compressed;
 }
 
 async function captureMobileMetrics(page, debug = false) {
   const metrics = await page.evaluate(() => ({
     viewport: { width: window.innerWidth, height: window.innerHeight },
-    orientation: screen.orientation ? screen.orientation.type : 'unknown',
+    orientation: screen.orientation?.type || 'unknown',
     memory: performance.memory ? {
       totalJSHeapSize: performance.memory.totalJSHeapSize,
       usedJSHeapSize: performance.memory.usedJSHeapSize,
     } : null,
   }));
-  if (debug) logger.info('Captured mobile metrics'); // ✅ CORRECT
+  if (debug) logger.info('Captured mobile metrics');
   return metrics;
 }
 
@@ -58,19 +57,26 @@ async function inspectElement(page, selector, debug = false) {
       boundingBox: el.getBoundingClientRect().toJSON(),
     } : null;
   }, selector);
-  if (debug) logger.info(`Inspected element: ${selector}`); // ✅ CORRECT
+  if (debug) logger.info(`Inspected element: ${selector}`);
   return element;
 }
 
 async function executeScript(page, script, debug = false) {
   try {
     const result = await page.evaluate(script);
-    if (debug) logger.info('Executed custom script'); // ✅ CORRECT
+    if (debug) logger.info('Executed custom script');
     return result;
   } catch (err) {
-    logger.error(`Script execution failed: ${err.message}`); // ✅ CORRECT
+    logger.error(`Script execution failed: ${err.message}`);
     return { error: err.message };
   }
 }
 
-module.exports = { captureTouchAndGestureEvents, captureHtml, captureScreenshot, captureMobileMetrics, inspectElement, executeScript };
+module.exports = {
+  captureTouchAndGestureEvents,
+  captureHtml,
+  captureScreenshot,
+  captureMobileMetrics,
+  inspectElement,
+  executeScript,
+};
