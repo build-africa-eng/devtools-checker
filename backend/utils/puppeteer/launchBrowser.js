@@ -44,7 +44,13 @@ async function launchBrowserWithRetries({
     try {
       browser = await puppeteer.launch({
         headless: 'new',
-        args: LAUNCH_ARGS,
+        // FIX: Add no-sandbox args for containerized environments and increase timeout
+        args: [
+            ...LAUNCH_ARGS,
+            '--no-sandbox',
+            '--disable-setuid-sandbox'
+        ],
+        timeout: 60000, // 60 seconds
         executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
       });
 
@@ -52,7 +58,7 @@ async function launchBrowserWithRetries({
       const sessionDir = path.join(__dirname, '../../sessions', String(sessionId));
       fs.mkdirSync(sessionDir, { recursive: true });
       
-      // ========== SET VIEWPORT (FIX) ==========
+      // ========== SET VIEWPORT ==========
       // Set a default viewport to prevent "0 width" screenshot errors
       await page.setViewport({ width: 1280, height: 800 });
 
@@ -104,12 +110,11 @@ async function launchBrowserWithRetries({
         debug && logger.debug(`REQ ${entry.status} ${entry.method} ${entry.url}`);
       });
 
-      // ========== JS CONSOLE LOGGING (FIXED) ==========
+      // ========== JS CONSOLE LOGGING ==========
       page.on('console', async (msg) => {
         const type = msg.type();
         try {
           const args = await Promise.all(msg.args().map(arg => arg.jsonValue()));
-          // FIX: Renamed full-Msg to fullMsg (removed hyphen)
           let fullMsg = ''; 
           for (const arg of args) {
             if (typeof arg === 'object' && arg !== null) {
@@ -131,7 +136,7 @@ async function launchBrowserWithRetries({
         }
       });
 
-      // ========== PAGE ERROR HANDLING (UPDATED) ==========
+      // ========== PAGE ERROR HANDLING ==========
       // Handles errors thrown within the page's context (e.g., window.onerror)
       page.on('pageerror', async (err) => {
         logger.error(`Page error: ${err.message}`);
@@ -148,7 +153,7 @@ async function launchBrowserWithRetries({
         }
       });
 
-      // ========== UNCAUGHT EXCEPTION HANDLING (NEW) ==========
+      // ========== UNCAUGHT EXCEPTION HANDLING ==========
       // Catches uncaught exceptions from the page (different from pageerror)
       page.on('error', async (err) => {
           logger.error(`Unhandled exception in page: ${err.message}`);
