@@ -11,7 +11,7 @@ async function setupNetworkCapture(page, options, wsServer) {
     maxRequests = 500,
     filterRequestTypes = ['document', 'xhr', 'fetch', 'script'],
     filterDomains = [],
-    requestTimeout = 10000,
+    requestTimeout = 100000,
     outputDir = './analysis',
     enableWebSocket = false,
   } = options;
