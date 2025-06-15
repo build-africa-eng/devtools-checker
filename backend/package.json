@@ -24,6 +24,6 @@
     "express-rate-limit": "^7.5.0",
     "puppeteer-extra-plugin-stealth": "^2.11.2",
     "cors": "^2.8.5",
-    "puppeteer": "^21.6.0"
+    "puppeteer": "^24.10.1"
   }
 }
