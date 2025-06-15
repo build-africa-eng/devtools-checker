@@ -159,7 +159,20 @@ if (followLinks) {
 
 return result;
 
-} catch (err) { logger.error(Analysis failed: ${err.message}); return { error: err.message }; } finally { if (wsServer) wsServer.close(); if (browser) { try { await browser.close(); if (options.debug) logger.info('Browser closed'); } catch (err) { if (options.debug) logger.warn(Error closing browser: ${err.message}); } } } }
+} catch (err) {
+  logger.error(`Analysis failed: ${err.message}`);
+  return { error: err.message };
+} finally {
+  if (wsServer) wsServer.close();
+  if (browser) {
+    try {
+      await browser.close();
+      if (options.debug) logger.info('Browser closed');
+    } catch (err) {
+      if (options.debug) logger.warn(`Error closing browser: ${err.message}`);
+    }
+  }
+}
 
 module.exports = analyzeUrl;
 
