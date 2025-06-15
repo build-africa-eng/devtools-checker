@@ -1,122 +1,210 @@
-const util = require('util');
+const isValidUrl = require('../isValidUrl');
 const logger = require('../logger');
+const { launchBrowserWithRetries } = require('./launchBrowser');
+const { setupLogging } = require('./setupLogging');
+const { setupNetworkCapture } = require('./setupNetworkCapture');
+const { runLighthouse } = require('./runLighthouse');
+const { runAccessibility } = require('./runAccessibility');
+const { setupTracing } = require('./setupTracing');
+const { captureTouchAndGestureEvents, captureHtml, captureScreenshot, captureMobileMetrics, getDomMetrics, inspectElement, executeScript } = require('./helpers');
+const WebSocket = require('ws');
+const fs = require('fs').promises;
 
-/**
- * Attempts to process a JSHandle/console argument with maximum detail.
- * @param {import('puppeteer').JSHandle} arg
- * @param {boolean} debug
- * @returns {Promise<*>}
- */
-async function processConsoleArg(arg, debug = false) {
+async function analyzeUrl(url, options = {}) {
+  let browser, page, wsServer;
+  const result = {};
+
   try {
-    const remoteObj = arg.remoteObject();
-    const type = remoteObj.type;
-    const subtype = remoteObj.subtype;
+    if (!isValidUrl(url)) throw new Error('Invalid URL');
 
-    if (type === 'undefined') return { value: undefined, type };
-    if (type === 'function') return { value: '[Function]', type, code: await arg.getProperty('toString').then(p => p.jsonValue()).catch(() => '[Code unavailable]') };
-    if (type === 'symbol') return { value: '[Symbol]', type };
-    if (type === 'bigint') return { value: remoteObj.value + 'n', type };
-    if (type === 'object' || type === 'function') {
-      if (subtype === 'error') {
-        const errVal = await arg.evaluate(e => ({
-          name: e.name,
-          message: e.message,
-          stack: e.stack || new Error().stack,
-          isIndexedDB: e.message?.includes('IndexedDB'),
-          isAbortError: e.name === 'AbortError' || e.message?.includes('AbortError'),
-        })).catch(() => ({
-          name: 'UnknownError',
-          message: 'Error object inaccessible',
-          stack: 'No stack trace available',
-          isIndexedDB: remoteObj.description?.includes('IndexedDB'),
-          isAbortError: remoteObj.description?.includes('AbortError'),
-        }));
-        return {
-          error: true,
-          name: errVal.name,
-          message: errVal.message,
-          stack: errVal.stack,
-          isIndexedDB: errVal.isIndexedDB,
-          isAbortError: errVal.isAbortError,
-          type: 'errorObject',
-          raw: remoteObj.description,
-        };
+    const {
+      device = 'iPhone 12',
+      customDevice = null,
+      includeHtml = false,
+      includeScreenshot = false,
+      includeLighthouse = false,
+      includeAccessibility = false,
+      includePerformanceTrace = false,
+      captureStacks = true,
+      captureHeaders = false,
+      captureResponseBodies = false,
+      maxBodySize = 10240,
+      maxLogs = 200,
+      maxRequests = 500,
+      onlyImportantLogs = false,
+      navigationTimeout = 300000, // Increased to 60 seconds
+      networkConditionsType = null, // Disabled network conditions
+      inspectElement: inspectSelector = null,
+      filterRequestTypes = ['document', 'xhr', 'fetch', 'script'],
+      filterDomains = [],
+      executeScript: scriptToRun = null,
+      debug = false,
+      enableWebSocket = false,
+      cpuThrottlingRate = 1,
+      followLinks = false,
+      maxLinks = 5,
+      requestTimeout = 240000,
+      outputDir = './analysis',
+    } = options;
+
+    await fs.mkdir(outputDir, { recursive: true });
+
+    let webSocketUrl = null;
+    if (enableWebSocket) {
+      if (process.env.NODE_ENV === 'production') {
+        webSocketUrl = process.env.WEBSOCKET_URL || null;
+        if (debug) logger.info(`WebSocket in production mode, url: ${webSocketUrl}`);
+      } else {
+        wsServer = new WebSocket.Server({ port: 8081 });
+        webSocketUrl = 'ws://localhost:8081';
+        wsServer.on('connection', (ws) => {
+          if (debug) logger.info('WebSocket client connected');
+          ws.on('message', async (msg) => {
+            try {
+              const { action, data } = JSON.parse(msg);
+              if (action === 'click' && data.selector) {
+                await page.click(data.selector);
+                ws.send(JSON.stringify({ status: 'Clicked', selector: data.selector }));
+              } else if (action === 'reload') {
+                await page.reload();
+                ws.send(JSON.stringify({ status: 'Reloaded' }));
+              }
+            } catch (err) {
+              ws.send(JSON.stringify({ error: err.message }));
+            }
+          });
+        });
       }
-
-      const val = await arg.jsonValue().catch(err => {
-        logger.warn(`JSON value failed: ${err.message}`, { remoteObj });
-        return { error: err.message, raw: remoteObj.description };
-      });
-      return {
-        value: typeof val === 'object' ? util.inspect(val, { depth: null }) : val,
-        type,
-        subtype,
-        raw: remoteObj.description,
-      };
     }
 
-    return { value: remoteObj.value, type };
-  } catch (err) {
-    logger.error(`Failed to process arg: ${err.message}`, { remoteObj: arg.remoteObject() });
-    return { error: err.message, type: 'processingError', raw: arg.toString() };
-  }
-}
+    ({ browser, page } = await launchBrowserWithRetries({
+      retries: 3,
+      device,
+      customDevice,
+      debug,
+      blockHosts: true,
+    }));
+    if (!page) {
+      logger.warn(`Browser initialization failed for ${url}, proceeding with fallback`);
+      return {
+        title: 'Analysis Incomplete',
+        html: '',
+        screenshot: '',
+        logs: [],
+        requests: [],
+        performance: { domContentLoaded: -1, load: -1, firstPaint: -1, largestContentfulPaint: -1 },
+        domMetrics: {},
+        warning: 'Analysis completed with limited data due to initialization issues.',
+        webSocket: null,
+        summary: { errors: 0, warnings: 0, requests: 0, loadTime: 0 },
+      };
+    }
+    await page.setBypassCSP(true);
 
-/**
- * Logs a console message with full details in JSON format, handling undefined args.
- * @param {object} msg
- * @param {string} msg.type
- * @param {string} msg.text
- * @param {number} msg.timestamp
- * @param {Array} msg.args
- * @param {string} msg.url
- * @param {number} msg.lineNumber
- * @param {number} msg.columnNumber
- * @param {string} msg.frameId
- * @param {string} msg.frameUrl
- * @param {boolean} debug
- */
-function formatAndLogMessage(msg, debug = false) {
-  const location = `${msg.url || ''}:${msg.lineNumber || -1}:${msg.columnNumber || -1}`;
-  const timestamp = new Date(msg.timestamp || Date.now()).toISOString();
-  const context = msg.frameUrl && msg.frameUrl !== (msg.url || '') ? ` (frame: ${msg.frameUrl})` : '';
+    // Network emulation disabled
+    if (debug) logger.info('Network monitoring and emulation disabled to avoid timeouts');
 
-  const logEntry = {
-    level: msg.type === 'error' ? 'error' : msg.type === 'warn' ? 'warn' : msg.type === 'info' ? 'info' : 'debug',
-    message: msg.text || 'No message',
-    url: msg.url || '',
-    lineNumber: msg.lineNumber || -1,
-    columnNumber: msg.columnNumber || -1,
-    frameId: msg.frameId || 'main',
-    frameUrl: msg.frameUrl || '',
-    timestamp: msg.timestamp || Date.now(),
-    isoTimestamp: timestamp,
-    context,
-    args: Array.isArray(msg.args) ? msg.args : [], // Ensure args is always an array
-  };
+    await page.emulateCPUThrottling(cpuThrottlingRate);
+    if (debug && cpuThrottlingRate !== 1) logger.info(`Applied CPU throttling: ${cpuThrottlingRate}x`);
 
-  // Enhance for errors with detailed context
-  const errorArg = (Array.isArray(msg.args) ? msg.args : []).find(arg => arg?.error);
-  if (errorArg) {
-    logEntry.errorDetails = {
-      message: errorArg.message || msg.text,
-      name: errorArg.name || 'UnknownError',
-      stackTrace: errorArg.stack || 'No stack trace available',
-      isIndexedDB: errorArg.isIndexedDB || false,
-      isAbortError: errorArg.isAbortError || false,
-      raw: errorArg.raw || '',
-      args: (Array.isArray(msg.args) ? msg.args : []).map(arg => (typeof arg === 'object' ? util.inspect(arg, { depth: null }) : String(arg))),
+    const touchEvents = [];
+    const gestureEvents = [];
+    await captureTouchAndGestureEvents(page);
+
+    const collectedLogs = [];
+    setupLogging(page, {
+      maxLogs,
+      onlyImportantLogs,
+      captureStacks,
+      debug,
+      enableWebSocket,
+    }, collectedLogs, wsServer);
+
+    const { requests, networkWaterfall } = await setupNetworkCapture(page, {
+      captureHeaders,
+      captureResponseBodies,
+      maxBodySize,
+      maxRequests,
+      filterRequestTypes,
+      filterDomains,
+      requestTimeout,
+      outputDir,
+      enableWebSocket,
+    }, wsServer);
+
+    let stopTracing;
+    if (includePerformanceTrace) {
+      stopTracing = await setupTracing(page, outputDir, debug);
+    }
+
+    const startTime = Date.now();
+    await page.goto(url, { waitUntil: 'networkidle2', timeout: navigationTimeout });
+    const loadTime = Date.now() - startTime;
+
+    if (includePerformanceTrace && stopTracing) {
+      result.performanceTrace = await stopTracing();
+    }
+
+    const performanceMetrics = await page.metrics();
+    const domMetrics = await getDomMetrics(page, debug);
+    const warning = collectedLogs.some(l => l.level === 'warning') ? 'Some warnings detected in logs' : null;
+
+    result.title = await page.title();
+    result.html = includeHtml ? await captureHtml(page, debug) : '';
+    result.screenshot = includeScreenshot ? await captureScreenshot(page, outputDir, debug) : '';
+    result.logs = collectedLogs;
+    result.requests = Array.isArray(requests) ? requests : [];
+    result.performance = {
+      domContentLoaded: performanceMetrics.DOMContentLoaded || -1,
+      load: loadTime / 1000,
+      firstPaint: performanceMetrics.FirstPaint || -1,
+      largestContentfulPaint: performanceMetrics.LargestContentfulPaint || -1,
     };
-    logEntry.message = `Enhanced ${msg.type.toUpperCase()}: ${logEntry.message}`;
-  }
+    result.domMetrics = domMetrics || {};
+    result.warning = warning;
+    result.webSocket = enableWebSocket && webSocketUrl ? { url: webSocketUrl, actions: ['click', 'reload'] } : null;
 
-  const jsonLog = JSON.stringify(logEntry, null, 2);
-  logger[logEntry.level](jsonLog);
-  if (debug) console.log(jsonLog);
+    result.summary = {
+      errors: collectedLogs.filter(l => l.level === 'PAGE_ERROR' || l.type === 'error').length,
+      warnings: collectedLogs.filter(l => l.level === 'warning' || l.type === 'warn').length,
+      requests: requests.length,
+      loadTime,
+    };
+
+    if (includeLighthouse) result.lighthouse = await runLighthouse(page, browser, debug);
+    if (includeAccessibility) result.accessibility = await runAccessibility(page, debug);
+    if (inspectSelector) result.element = await inspectElement(page, inspectSelector, debug);
+    if (scriptToRun) result.scriptResult = await executeScript(page, scriptToRun, debug);
+
+    if (followLinks) {
+      const links = await page.$$eval('a', as =>
+        as.map(a => a.href).filter(href => href.startsWith('http'))
+      );
+      result.relatedPages = await Promise.all(
+        [...new Set(links)].slice(0, maxLinks).map(link =>
+          analyzeUrl(link, { ...options, followLinks: false }).catch(err => ({
+            url: link,
+            error: err.message,
+          }))
+        )
+      );
+    }
+
+    return result;
+  } catch (err) {
+    logger.error(`Analysis failed: ${err.message}`);
+    return { error: err.message };
+  } finally {
+    if (wsServer) wsServer.close();
+    if (browser) {
+      try {
+        await browser.close();
+        if (options.debug) logger.info('Browser closed');
+      } catch (err) {
+        if (options.debug) logger.warn(`Error closing browser: ${err.message}`);
+      }
+    }
+  }
 }
 
-module.exports = {
-  processConsoleArg,
-  formatAndLogMessage,
-};
+module.exports = { analyzeUrl };
