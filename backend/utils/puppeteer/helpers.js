@@ -2,62 +2,82 @@ const fs = require('fs').promises;
 const logger = require('../logger');
 const { compressToBase64 } = require('./compression');
 
+/**
+ * Wraps a promise with a timeout.
+ */
+function withTimeout(promise, ms, message) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => setTimeout(() => reject(new Error(message)), ms)),
+  ]);
+}
+
+/**
+ * Attaches touch and gesture event logging to the page's console.
+ */
 async function captureTouchAndGestureEvents(page) {
-  if (!page) {
-    logger.error('Invalid page instance for capturing touch and gesture events');
-    return;
+  if (!page) return logger.warn('Page instance is null - skipping touch/gesture capture');
+
+  try {
+    await page.evaluate(() => {
+      document.addEventListener('touchstart', (e) => {
+        console.log('Touch event:', JSON.stringify({
+          touches: Array.from(e.touches).map(t => ({ x: t.clientX, y: t.clientY })),
+          timestamp: Date.now(),
+        }));
+      });
+      document.addEventListener('gesturestart', (e) => {
+        console.log('Gesture event:', JSON.stringify({
+          scale: e.scale,
+          rotation: e.rotation,
+          timestamp: Date.now(),
+        }));
+      });
+    });
+  } catch {
+    logger.warn('Failed to inject touch/gesture event listeners');
   }
-  await page.evaluate(() => {
-    document.addEventListener('touchstart', (e) => {
-      console.log('Touch event:', JSON.stringify({
-        touches: Array.from(e.touches).map(t => ({ x: t.clientX, y: t.clientY })),
-        timestamp: Date.now(),
-      }));
-    });
-    document.addEventListener('gesturestart', (e) => {
-      console.log('Gesture event:', JSON.stringify({
-        scale: e.scale,
-        rotation: e.rotation,
-        timestamp: Date.now(),
-      }));
-    });
-  }).catch(() => {});
 }
 
+/**
+ * Captures and compresses page HTML.
+ */
 async function captureHtml(page, debug = false) {
-  if (!page) {
-    logger.error('Invalid page instance for capturing HTML');
-    return null;
-  }
-  const html = await Promise.race([
+  if (!page) return logger.warn('Page instance is null - skipping HTML capture'), null;
+
+  const html = await withTimeout(
     page.content(),
-    new Promise((_, reject) => setTimeout(() => reject(new Error('HTML capture timed out')), 10000)),
-  ]);
+    10000,
+    'HTML capture timed out'
+  );
   const compressed = await compressToBase64(html);
-  if (debug) logger.info('Captured and compressed HTML');
+  debug && logger.info('Captured and compressed HTML');
   return compressed;
 }
 
+/**
+ * Captures and compresses a full-page screenshot.
+ */
 async function captureScreenshot(page, debug = false) {
-  if (!page) {
-    logger.error('Invalid page instance for capturing screenshot');
-    return null;
-  }
-  const ss = await Promise.race([
+  if (!page) return logger.warn('Page instance is null - skipping screenshot'), null;
+
+  const buffer = await withTimeout(
     page.screenshot({ encoding: 'binary', fullPage: true }),
-    new Promise((_, reject) => setTimeout(() => reject(new Error('Screenshot capture timed out')), 10000)),
-  ]);
-  const compressed = await compressToBase64(ss);
-  if (debug) logger.info('Captured and compressed screenshot');
+    10000,
+    'Screenshot capture timed out'
+  );
+  const compressed = await compressToBase64(buffer);
+  debug && logger.info('Captured and compressed screenshot');
   return compressed;
 }
 
+/**
+ * Captures mobile-specific metrics from the page.
+ */
 async function captureMobileMetrics(page, debug = false) {
-  if (!page) {
-    logger.error('Invalid page instance for capturing mobile metrics');
-    return null;
-  }
-  const metrics = await Promise.race([
+  if (!page) return logger.warn('Page instance is null - skipping mobile metrics'), null;
+
+  const metrics = await withTimeout(
     page.evaluate(() => ({
       viewport: { width: window.innerWidth, height: window.innerHeight },
       orientation: screen.orientation?.type || 'unknown',
@@ -66,18 +86,20 @@ async function captureMobileMetrics(page, debug = false) {
         usedJSHeapSize: performance.memory.usedJSHeapSize,
       } : null,
     })),
-    new Promise((_, reject) => setTimeout(() => reject(new Error('Metrics capture timed out')), 5000)),
-  ]);
-  if (debug) logger.info('Captured mobile metrics');
+    5000,
+    'Mobile metrics capture timed out'
+  );
+  debug && logger.info('Captured mobile metrics');
   return metrics;
 }
 
+/**
+ * Retrieves DOM size, depth, and element breakdown.
+ */
 async function getDomMetrics(page, debug = false) {
-  if (!page) {
-    logger.error('Invalid page instance for capturing DOM metrics');
-    return null;
-  }
-  const metrics = await Promise.race([
+  if (!page) return logger.warn('Page instance is null - skipping DOM metrics'), null;
+
+  const metrics = await withTimeout(
     page.evaluate(() => {
       function getNodeCount(node = document) {
         let count = 1;
@@ -118,18 +140,20 @@ async function getDomMetrics(page, debug = false) {
         elementBreakdown: getElementBreakdown(),
       };
     }),
-    new Promise((_, reject) => setTimeout(() => reject(new Error('DOM metrics capture timed out')), 5000)),
-  ]);
-  if (debug) logger.info('Captured DOM metrics');
+    5000,
+    'DOM metrics capture timed out'
+  );
+  debug && logger.info('Captured DOM metrics');
   return metrics;
 }
 
+/**
+ * Extracts attributes, bounding box, and outerHTML of a selector.
+ */
 async function inspectElement(page, selector, debug = false) {
-  if (!page) {
-    logger.error('Invalid page instance for inspecting element');
-    return null;
-  }
-  const element = await Promise.race([
+  if (!page) return logger.warn('Page instance is null - skipping element inspection'), null;
+
+  const element = await withTimeout(
     page.evaluate((sel) => {
       const el = document.querySelector(sel);
       return el ? {
@@ -138,23 +162,26 @@ async function inspectElement(page, selector, debug = false) {
         boundingBox: el.getBoundingClientRect().toJSON(),
       } : null;
     }, selector),
-    new Promise((_, reject) => setTimeout(() => reject(new Error('Element inspection timed out')), 5000)),
-  ]);
-  if (debug) logger.info(`Inspected element: ${selector}`);
+    5000,
+    'Element inspection timed out'
+  );
+  debug && logger.info(`Inspected element: ${selector}`);
   return element;
 }
 
+/**
+ * Executes custom JavaScript in the page context.
+ */
 async function executeScript(page, script, debug = false) {
-  if (!page) {
-    logger.error('Invalid page instance for executing script');
-    return { error: 'Invalid page instance' };
-  }
+  if (!page) return logger.warn('Page instance is null - skipping script execution'), { error: 'No page' };
+
   try {
-    const result = await Promise.race([
+    const result = await withTimeout(
       page.evaluate(script),
-      new Promise((_, reject) => setTimeout(() => reject(new Error('Script execution timed out')), 5000)),
-    ]);
-    if (debug) logger.info('Executed custom script');
+      5000,
+      'Script execution timed out'
+    );
+    debug && logger.info('Executed custom script');
     return result;
   } catch (err) {
     logger.error(`Script execution failed: ${err.message}`);
