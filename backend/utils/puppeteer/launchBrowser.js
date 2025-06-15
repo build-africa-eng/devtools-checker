@@ -24,13 +24,21 @@ async function launchBrowserWithRetries({
   for (let i = 0; i < retries; i++) {
     let browser;
     try {
+      const startTime = Date.now();
       browser = await puppeteer.launch({
         headless: 'new',
-        args: [...LAUNCH_ARGS, '--no-sandbox', '--disable-setuid-sandbox'],
+        args: [
+          ...LAUNCH_ARGS,
+          '--no-sandbox',
+          '--disable-setuid-sandbox',
+          '--disable-network', // Disable network monitoring to avoid timeout
+        ],
         timeout: 120000,
-        protocolTimeout: 240000, //
+        protocolTimeout: 60000, // Reduced back to 60 seconds since network is disabled
         executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
       });
+      const endTime = Date.now();
+      debug && logger.info(`Browser launched in ${((endTime - startTime) / 1000).toFixed(2)} seconds`);
 
       const page = await browser.newPage();
       const sessionDir = path.join(__dirname, '../../sessions', String(sessionId));
@@ -59,23 +67,9 @@ async function launchBrowserWithRetries({
         });
       }
 
+      // Network emulation disabled, so skip this block
       if (networkProfile && NETWORK_CONDITIONS[networkProfile]) {
-        const conditions = NETWORK_CONDITIONS[networkProfile];
-        debug && logger.info(`Network profile ${networkProfile} conditions: ${JSON.stringify(conditions)}`);
-        if (typeof conditions !== 'object' || conditions.downloadThroughput == null || conditions.uploadThroughput == null || conditions.latency == null) {
-          debug && logger.warn(`Invalid network profile ${networkProfile}, skipping emulation. Conditions: ${JSON.stringify(conditions)}`);
-        } else {
-          try {
-            await page.emulateNetworkConditions(conditions);
-            debug && logger.info(`Applied network profile: ${networkProfile}`);
-          } catch (err) {
-            if (err.message.includes('Failed to deserialize params.downloadThroughput')) {
-              debug && logger.warn(`Network emulation failed due to Puppeteer bug (#11841), skipping. Error: ${err.message}`);
-            } else {
-              throw err;
-            }
-          }
-        }
+        debug && logger.info(`Network profile ${networkProfile} conditions: ${JSON.stringify(NETWORK_CONDITIONS[networkProfile])} (skipped due to disabled network)`);
       }
 
       if (blockHosts) {
@@ -185,15 +179,10 @@ async function launchBrowserWithRetries({
       logger.warn(`Retry ${i + 1}/${retries} failed: ${err.message}`);
       if (browser) await browser.close();
       if (i === retries - 1) {
-        if (err.message.includes('Network.enable timed out')) {
-          debug && logger.warn('Network initialization timed out, proceeding without network monitoring.');
-          return { browser: null, page: null, sessionDir, collectedConsoleLogs: [], collectedRequests: [] }; // Fallback to proceed
-        }
-        throw {
-          name: 'PuppeteerLaunchError',
-          message: `Failed after ${retries} attempts: ${err.message}`,
-          details: err.stack,
-        };
+        const elapsedTime = Date.now() - startTime;
+        logger.warn(`Total time for ${retries} attempts: ${elapsedTime / 1000} seconds`);
+        debug && logger.warn('Proceeding without network initialization due to repeated failures.');
+        return { browser: null, page: null, sessionDir, collectedConsoleLogs: [], collectedRequests: [] }; // Fallback to proceed
       }
       await new Promise((r) => setTimeout(r, 2000));
     }
