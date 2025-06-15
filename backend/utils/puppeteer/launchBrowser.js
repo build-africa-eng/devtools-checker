@@ -28,6 +28,7 @@ async function launchBrowserWithRetries({
         headless: 'new',
         args: [...LAUNCH_ARGS, '--no-sandbox', '--disable-setuid-sandbox'],
         timeout: 120000,
+        protocolTimeout: 180000,
         executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
       });
 
@@ -60,6 +61,7 @@ async function launchBrowserWithRetries({
 
       if (networkProfile && NETWORK_CONDITIONS[networkProfile]) {
         const conditions = NETWORK_CONDITIONS[networkProfile];
+        debug && logger.info(`Network profile ${networkProfile} conditions: ${JSON.stringify(conditions)}`);
         if (typeof conditions !== 'object' || conditions.downloadThroughput == null || conditions.uploadThroughput == null || conditions.latency == null) {
           debug && logger.warn(`Invalid network profile ${networkProfile}, skipping emulation. Conditions: ${JSON.stringify(conditions)}`);
         } else {
