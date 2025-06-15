@@ -47,7 +47,7 @@ async function captureHtml(page, debug = false) {
 
   const html = await withTimeout(
     page.content(),
-    10000,
+    120000,
     'HTML capture timed out'
   );
   const compressed = await compressToBase64(html);
@@ -63,7 +63,7 @@ async function captureScreenshot(page, debug = false) {
 
   const buffer = await withTimeout(
     page.screenshot({ encoding: 'binary', fullPage: true }),
-    10000,
+    120000,
     'Screenshot capture timed out'
   );
   const compressed = await compressToBase64(buffer);
@@ -86,7 +86,7 @@ async function captureMobileMetrics(page, debug = false) {
         usedJSHeapSize: performance.memory.usedJSHeapSize,
       } : null,
     })),
-    5000,
+    10000,
     'Mobile metrics capture timed out'
   );
   debug && logger.info('Captured mobile metrics');
@@ -140,7 +140,7 @@ async function getDomMetrics(page, debug = false) {
         elementBreakdown: getElementBreakdown(),
       };
     }),
-    5000,
+    10000,
     'DOM metrics capture timed out'
   );
   debug && logger.info('Captured DOM metrics');
@@ -178,7 +178,7 @@ async function executeScript(page, script, debug = false) {
   try {
     const result = await withTimeout(
       page.evaluate(script),
-      5000,
+      10000,
       'Script execution timed out'
     );
     debug && logger.info('Executed custom script');
