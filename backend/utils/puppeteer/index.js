@@ -30,7 +30,7 @@ const {
   cpuThrottlingRate = 1,
   followLinks = false,
   maxLinks = 5,
-  requestTimeout = 10000,
+  requestTimeout = 120000,
   outputDir = './analysis',
 } = options;
 
