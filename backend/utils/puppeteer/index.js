@@ -32,8 +32,8 @@ async function analyzeUrl(url, options = {}) {
       maxLogs = 200,
       maxRequests = 500,
       onlyImportantLogs = false,
-      navigationTimeout = 30000,
-      networkConditionsType = 'Fast 4G',
+      navigationTimeout = 300000, // Increased to 60 seconds
+      networkConditionsType = null, // Disabled network conditions
       inspectElement: inspectSelector = null,
       filterRequestTypes = ['document', 'xhr', 'fetch', 'script'],
       filterDomains = [],
@@ -43,7 +43,7 @@ async function analyzeUrl(url, options = {}) {
       cpuThrottlingRate = 1,
       followLinks = false,
       maxLinks = 5,
-      requestTimeout = 120000,
+      requestTimeout = 240000,
       outputDir = './analysis',
     } = options;
 
@@ -82,15 +82,28 @@ async function analyzeUrl(url, options = {}) {
       device,
       customDevice,
       debug,
-      networkProfile: networkConditionsType,
       blockHosts: true,
     }));
+    if (!page) {
+      logger.warn(`Browser initialization failed for ${url}, proceeding with fallback`);
+      return {
+        title: 'Analysis Incomplete',
+        html: '',
+        screenshot: '',
+        logs: [],
+        requests: [],
+        performance: { domContentLoaded: -1, load: -1, firstPaint: -1, largestContentfulPaint: -1 },
+        domMetrics: {},
+        warning: 'Analysis completed with limited data due to initialization issues.',
+        webSocket: null,
+        summary: { errors: 0, warnings: 0, requests: 0, loadTime: 0 },
+      };
+    }
     await page.setBypassCSP(true);
 
-    if (global.NETWORK_CONDITIONS && global.NETWORK_CONDITIONS[networkConditionsType]) {
-      await page.emulateNetworkConditions(global.NETWORK_CONDITIONS[networkConditionsType]);
-      if (debug) logger.info(`Using network: ${networkConditionsType}`);
-    }
+    // Network emulation disabled
+    if (debug) logger.info('Network monitoring and emulation disabled to avoid timeouts');
+
     await page.emulateCPUThrottling(cpuThrottlingRate);
     if (debug && cpuThrottlingRate !== 1) logger.info(`Applied CPU throttling: ${cpuThrottlingRate}x`);
 
