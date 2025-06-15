@@ -65,8 +65,16 @@ async function launchBrowserWithRetries({
         if (typeof conditions !== 'object' || conditions.downloadThroughput == null || conditions.uploadThroughput == null || conditions.latency == null) {
           debug && logger.warn(`Invalid network profile ${networkProfile}, skipping emulation. Conditions: ${JSON.stringify(conditions)}`);
         } else {
-          await page.emulateNetworkConditions(conditions);
-          debug && logger.info(`Applied network profile: ${networkProfile}`);
+          try {
+            await page.emulateNetworkConditions(conditions);
+            debug && logger.info(`Applied network profile: ${networkProfile}`);
+          } catch (err) {
+            if (err.message.includes('Failed to deserialize params.downloadThroughput')) {
+              debug && logger.warn(`Network emulation failed due to Puppeteer bug (#11841), skipping. Error: ${err.message}`);
+            } else {
+              throw err;
+            }
+          }
         }
       }
 
