@@ -59,8 +59,13 @@ async function launchBrowserWithRetries({
       }
 
       if (networkProfile && NETWORK_CONDITIONS[networkProfile]) {
-        await page.emulateNetworkConditions(NETWORK_CONDITIONS[networkProfile]);
-        debug && logger.info(`Applied network profile: ${networkProfile}`);
+        const conditions = NETWORK_CONDITIONS[networkProfile];
+        if (typeof conditions !== 'object' || conditions.downloadThroughput == null || conditions.uploadThroughput == null || conditions.latency == null) {
+          debug && logger.warn(`Invalid network profile ${networkProfile}, skipping emulation. Conditions: ${JSON.stringify(conditions)}`);
+        } else {
+          await page.emulateNetworkConditions(conditions);
+          debug && logger.info(`Applied network profile: ${networkProfile}`);
+        }
       }
 
       if (blockHosts) {
