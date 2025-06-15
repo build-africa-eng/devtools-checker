@@ -40,9 +40,10 @@ function setupLogging(
     if (onlyImportantLogs && !['error', 'warn'].includes(normalizedType)) return;
 
     const location = msg.location();
-    const frame = msg.executionContext()?.frame?.();
-    const frameId = frame?._id || frame?.url() || 'main';
-    const frameUrl = frame?.url?.() || '';
+    // Use page.mainFrame() as a fallback since executionContext is unavailable
+    const frame = page.mainFrame();
+    const frameId = frame?._id || (location.url ? `frame-${location.url}` : 'main');
+    const frameUrl = frame?.url?.() || location.url || '';
 
     const messageEntry = {
       type: normalizedType,
@@ -75,11 +76,11 @@ function setupLogging(
       text: `Page Unhandled Error: ${err.message}`,
       timestamp: Date.now(),
       args: [{ error: err.message, stack: err.stack, name: err.name || 'Error' }],
-      url: err.url || '',
+      url: err.url || page.url() || '',
       lineNumber: err.lineNumber ?? -1,
       columnNumber: err.columnNumber ?? -1,
       frameId: 'main',
-      frameUrl: page.url(),
+      frameUrl: page.url() || '',
     };
     collectedConsoleLogs.push(logEntry);
     logger.error(`Page error: ${err.message}`);
@@ -91,7 +92,7 @@ function setupLogging(
     try {
       const meta = {
         type: eventType,
-        frameId: frame?._id || `frame-${frame?._url || 'unknown'}`,
+        frameId: frame?._id || `frame-${frame?.url() || 'unknown'}`,
         url: frame?.url?.() || 'about:blank',
         parentFrame: frame?.parentFrame?.()?.url?.() || null,
         timestamp: Date.now(),
