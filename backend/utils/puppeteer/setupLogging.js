@@ -2,25 +2,9 @@ const logger = require('../logger');
 const { processConsoleArg, formatAndLogMessage } = require('./enhancedLogging');
 const { OPEN } = require('ws');
 
-/**
- * Sets up logging and frame lifecycle tracking on a Puppeteer page.
- * @param {import('puppeteer').Page} page
- * @param {object} options
- * @param {boolean} options.onlyImportantLogs
- * @param {boolean} options.captureStacks
- * @param {boolean} options.debug
- * @param {boolean} options.enableWebSocket
- * @param {Array} collectedConsoleLogs
- * @param {WebSocket.Server|null} [wsServer=null]
- */
 function setupLogging(
   page,
-  {
-    onlyImportantLogs = false,
-    captureStacks = true,
-    debug = false,
-    enableWebSocket = false,
-  },
+  { onlyImportantLogs = false, captureStacks = true, debug = false, enableWebSocket = false, maxLogs = 200 },
   collectedConsoleLogs,
   wsServer = null
 ) {
@@ -33,14 +17,12 @@ function setupLogging(
     });
   };
 
-  // Console message handler
   page.on('console', async (msg) => {
     const type = msg.type();
     const normalizedType = ['log', 'error', 'warn', 'info'].includes(type) ? type : 'log';
     if (onlyImportantLogs && !['error', 'warn'].includes(normalizedType)) return;
 
     const location = msg.location();
-    // Use page.mainFrame() as a fallback since executionContext is unavailable
     const frame = page.mainFrame();
     const frameId = frame?._id || (location.url ? `frame-${location.url}` : 'main');
     const frameUrl = frame?.url?.() || location.url || '';
@@ -59,17 +41,17 @@ function setupLogging(
 
     try {
       messageEntry.args = await Promise.all(msg.args().map(arg => processConsoleArg(arg, debug)));
+      if (collectedConsoleLogs.length < maxLogs) collectedConsoleLogs.push(messageEntry);
+      formatAndLogMessage(messageEntry, debug);
+      sendWs('log', messageEntry);
     } catch (err) {
-      messageEntry.args = [`Failed to process: ${err.message}`];
+      messageEntry.args = [{ error: err.message, type: 'processingError' }];
+      if (collectedConsoleLogs.length < maxLogs) collectedConsoleLogs.push(messageEntry);
       logger.warn(`Console arg error: ${err.message}`);
+      sendWs('log', messageEntry);
     }
-
-    collectedConsoleLogs.push(messageEntry);
-    if (debug) formatAndLogMessage(messageEntry, debug);
-    sendWs('log', messageEntry);
   });
 
-  // Uncaught page errors
   page.on('pageerror', (err) => {
     const logEntry = {
       type: 'error',
@@ -82,12 +64,12 @@ function setupLogging(
       frameId: 'main',
       frameUrl: page.url() || '',
     };
-    collectedConsoleLogs.push(logEntry);
+    if (collectedConsoleLogs.length < maxLogs) collectedConsoleLogs.push(logEntry);
     logger.error(`Page error: ${err.message}`);
+    formatAndLogMessage(logEntry, debug);
     sendWs('log', logEntry);
   });
 
-  // Frame lifecycle: attach/detach/navigate
   const handleFrameEvent = (eventType, frame) => {
     try {
       const meta = {
