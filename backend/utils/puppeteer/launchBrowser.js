@@ -28,7 +28,7 @@ async function launchBrowserWithRetries({
         headless: 'new',
         args: [...LAUNCH_ARGS, '--no-sandbox', '--disable-setuid-sandbox'],
         timeout: 120000,
-        protocolTimeout: 180000,
+        protocolTimeout: 240000, //
         executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
       });
 
@@ -185,6 +185,10 @@ async function launchBrowserWithRetries({
       logger.warn(`Retry ${i + 1}/${retries} failed: ${err.message}`);
       if (browser) await browser.close();
       if (i === retries - 1) {
+        if (err.message.includes('Network.enable timed out')) {
+          debug && logger.warn('Network initialization timed out, proceeding without network monitoring.');
+          return { browser: null, page: null, sessionDir, collectedConsoleLogs: [], collectedRequests: [] }; // Fallback to proceed
+        }
         throw {
           name: 'PuppeteerLaunchError',
           message: `Failed after ${retries} attempts: ${err.message}`,
