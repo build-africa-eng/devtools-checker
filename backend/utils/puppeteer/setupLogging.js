@@ -1,63 +1,112 @@
 const logger = require('../logger');
+const { processConsoleArg, formatAndLogMessage } = require('./enhancedLogging');
+const { OPEN } = require('ws');
 
-function setupLogging(page, options, touchEvents, gestureEvents, wsServer) {
-  const { maxLogs = 200, onlyImportantLogs = false, captureStacks = true, debug = false, enableWebSocket = false } = options;
-  const logs = [];
-
-  // Validate page instance
-  if (!page) {
-    if (debug) logger.error('Invalid page instance for logging setup');
-    return logs;
-  }
-
-  page.on('console', async (msg) => {
-    if (logs.length >= maxLogs) return;
-    const level = msg.type();
-    if (onlyImportantLogs && !['error', 'warning'].includes(level)) return;
-
-    const args = await Promise.all(msg.args().map(arg => arg.jsonValue().catch(() => arg.toString())));
-    const logEntry = { level, message: msg.text(), location: msg.location(), timestamp: new Date().toISOString(), args };
-
-    if (msg.text().startsWith('Touch event:')) {
-      try {
-        touchEvents.push(JSON.parse(msg.text().replace('Touch event:', '')));
-      } catch {}
-    } else if (msg.text().startsWith('Gesture event:')) {
-      try {
-        gestureEvents.push(JSON.parse(msg.text().replace('Gesture event:', '')));
-      } catch {}
-    }
-
-    if (captureStacks && msg.stackTrace()) {
-      logEntry.stack = msg.stackTrace().map(f => ({ file: f.url, line: f.lineNumber, column: f.columnNumber }));
-    }
-
-    logs.push(logEntry);
-
-    if (enableWebSocket && wsServer) {
-      wsServer.clients.forEach(client => {
-        if (client.readyState === 1) {
-          client.send(JSON.stringify({ type: 'log', data: logEntry }));
-        }
-      });
-    }
-  });
-
-  page.on('pageerror', (err) => {
-    if (logs.length < maxLogs) {
-      const errorLog = { level: 'PAGE_ERROR', message: err.message, stack: err.stack, timestamp: new Date().toISOString() };
-      logs.push(errorLog);
-      if (enableWebSocket && wsServer) {
-        wsServer.clients.forEach(client => {
-          if (client.readyState === 1) {
-            client.send(JSON.stringify({ type: 'error', data: errorLog }));
-          }
-        });
+/**
+ * Sets up logging and frame lifecycle tracking on a Puppeteer page.
+ * @param {import('puppeteer').Page} page
+ * @param {object} options
+ * @param {boolean} options.onlyImportantLogs
+ * @param {boolean} options.captureStacks
+ * @param {boolean} options.debug
+ * @param {boolean} options.enableWebSocket
+ * @param {Array} collectedConsoleLogs
+ * @param {WebSocket.Server|null} [wsServer=null]
+ */
+function setupLogging(
+  page,
+  {
+    onlyImportantLogs = false,
+    captureStacks = true,
+    debug = false,
+    enableWebSocket = false,
+  },
+  collectedConsoleLogs,
+  wsServer = null
+) {
+  const sendWs = (type, data) => {
+    if (!enableWebSocket || !wsServer) return;
+    wsServer.clients.forEach(client => {
+      if (client.readyState === OPEN) {
+        client.send(JSON.stringify({ type, data }));
       }
+    });
+  };
+
+  // Console message handler
+  page.on('console', async (msg) => {
+    const type = msg.type();
+    const normalizedType = ['log', 'error', 'warn', 'info'].includes(type) ? type : 'log';
+    if (onlyImportantLogs && !['error', 'warn'].includes(normalizedType)) return;
+
+    const location = msg.location();
+    const frame = msg.executionContext()?.frame?.();
+    const frameId = frame?._id || frame?.url() || 'main';
+    const frameUrl = frame?.url?.() || '';
+
+    const messageEntry = {
+      type: normalizedType,
+      text: msg.text(),
+      timestamp: Date.now(),
+      args: [],
+      url: location?.url || '',
+      lineNumber: location?.lineNumber ?? -1,
+      columnNumber: location?.columnNumber ?? -1,
+      frameId,
+      frameUrl,
+    };
+
+    try {
+      messageEntry.args = await Promise.all(msg.args().map(arg => processConsoleArg(arg, debug)));
+    } catch (err) {
+      messageEntry.args = [`Failed to process: ${err.message}`];
+      logger.warn(`Console arg error: ${err.message}`);
     }
+
+    collectedConsoleLogs.push(messageEntry);
+    if (debug) formatAndLogMessage(messageEntry, debug);
+    sendWs('log', messageEntry);
   });
 
-  return logs;
+  // Uncaught page errors
+  page.on('pageerror', (err) => {
+    const logEntry = {
+      type: 'error',
+      text: `Page Unhandled Error: ${err.message}`,
+      timestamp: Date.now(),
+      args: [{ error: err.message, stack: err.stack, name: err.name || 'Error' }],
+      url: err.url || '',
+      lineNumber: err.lineNumber ?? -1,
+      columnNumber: err.columnNumber ?? -1,
+      frameId: 'main',
+      frameUrl: page.url(),
+    };
+    collectedConsoleLogs.push(logEntry);
+    logger.error(`Page error: ${err.message}`);
+    sendWs('log', logEntry);
+  });
+
+  // Frame lifecycle: attach/detach/navigate
+  const handleFrameEvent = (eventType, frame) => {
+    try {
+      const meta = {
+        type: eventType,
+        frameId: frame?._id || `frame-${frame?._url || 'unknown'}`,
+        url: frame?.url?.() || 'about:blank',
+        parentFrame: frame?.parentFrame?.()?.url?.() || null,
+        timestamp: Date.now(),
+      };
+      logger.info(`Frame ${eventType}: ${meta.url}`);
+      collectedConsoleLogs.push(meta);
+      sendWs('frame', meta);
+    } catch (err) {
+      logger.warn(`Error handling frame ${eventType}: ${err.message}`);
+    }
+  };
+
+  page.on('frameattached', frame => handleFrameEvent('frameattached', frame));
+  page.on('framedetached', frame => handleFrameEvent('framedetached', frame));
+  page.on('framenavigated', frame => handleFrameEvent('framenavigated', frame));
 }
 
 module.exports = { setupLogging };
