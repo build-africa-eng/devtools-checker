@@ -61,21 +61,46 @@ function setupLogging(
   });
 
   const handleFrameEvent = (eventType, frame) => {
-    const meta = {
-      type: eventType,
-      frameId: frame?._id || `frame-${frame?.url() || 'unknown'}`,
-      url: frame?.url?.() || 'about:blank',
-      parentFrame: frame?.parentFrame?.()?.url?.() || null,
-      timestamp: Date.now(),
-    };
-    if (collectedConsoleLogs.length < maxLogs) collectedConsoleLogs.push(meta);
-    formatAndLogMessage(meta, debug);
-    sendWs('frame', meta);
+    try {
+      const meta = {
+        type: 'info',
+        text: `Frame ${eventType}: ${frame?.url() || 'unknown'}`,
+        timestamp: Date.now(),
+        args: [], // Explicitly set to empty array
+        url: frame?.url() || 'about:blank',
+        lineNumber: -1,
+        columnNumber: -1,
+        frameId: frame?._id || `frame-${frame?.url() || 'unknown'}`,
+        frameUrl: frame?.url() || 'about:blank',
+      };
+      if (collectedConsoleLogs.length < maxLogs) collectedConsoleLogs.push(meta);
+      formatAndLogMessage(meta, debug);
+      sendWs('frame', meta);
+    } catch (err) {
+      logger.error(`Failed to handle frame ${eventType}: ${err.message}`, { stack: err.stack });
+    }
   };
 
   page.on('frameattached', frame => handleFrameEvent('frameattached', frame));
   page.on('framedetached', frame => handleFrameEvent('framedetached', frame));
   page.on('framenavigated', frame => handleFrameEvent('framenavigated', frame));
+
+  // Handle uncaught exceptions to prevent crashes
+  process.on('unhandledRejection', (reason, promise) => {
+    logger.error('Unhandled Rejection:', {
+      reason: reason.message || reason,
+      stack: reason.stack,
+      promise,
+    });
+  });
+
+  process.on('uncaughtException', (err) => {
+    logger.error('Uncaught Exception:', {
+      message: err.message,
+      stack: err.stack,
+    });
+    process.exit(1); // Restart or exit gracefully
+  });
 }
 
 module.exports = { setupLogging };
