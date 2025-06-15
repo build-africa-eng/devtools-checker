@@ -15,7 +15,7 @@ const events = trace.traceEvents || []; const eventTypes = new Set(); let minTs 
 
 for (const e of events) { if (e.ts != null) { minTs = Math.min(minTs, e.ts); maxTs = Math.max(maxTs, e.ts); } if (e.name) { eventTypes.add(e.name); if (e.name === 'Screenshot') screenshotCount++; } }
 
-return { totalEvents: events.length, uniqueEventTypes: [...eventTypes], screenshotCount, startTime: minTs, endTime: maxTs, durationMs: (maxTs - minTs) / 1000, }; }
+return { totalEvents: events.length, uniqueEventTypes: [...eventTypes], screenshotCount, startTime: minTs, endTime: maxTs, durationMs: (maxTs - minTs) / 10000, }; }
 
 /**
 
@@ -47,7 +47,7 @@ await Promise.race([
     ],
   }),
   new Promise((_, reject) =>
-    setTimeout(() => reject(new Error('Tracing start timed out')), 30000)
+    setTimeout(() => reject(new Error('Tracing start timed out')), 60000)
   ),
 ]);
 
@@ -55,7 +55,7 @@ if (debug) logger.info(`Tracing started: ${tracePath}`);
 
 } catch (err) { logger.error(Tracing start failed: ${err.message}); throw err; }
 
-return async () => { try { await Promise.race([ page.tracing.stop(), new Promise((_, reject) => setTimeout(() => reject(new Error('Tracing stop timed out')), 30000) ), ]);
+return async () => { try { await Promise.race([ page.tracing.stop(), new Promise((_, reject) => setTimeout(() => reject(new Error('Tracing stop timed out')), 60000) ), ]);
 
 const traceStats = await stat(tracePath).catch(() => null);
   const fileSize = traceStats ? (traceStats.size / (1024 * 1024)).toFixed(2) : 'unknown';
