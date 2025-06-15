@@ -27,7 +27,7 @@ puppeteer.use(AdblockerPlugin({ blockTrackers: true }));
  * @param {string|null} [options.networkProfile=null] - A network condition profile to emulate.
  * @param {boolean} [options.blockHosts=true] - Whether to block requests to known tracking/ad hosts.
  * @param {string|number} [options.sessionId=Date.now()] - A unique ID for the session to store logs and screenshots.
- * @returns {Promise<{browser: import('puppeteer').Browser, page: import('puppeteer').Page, sessionDir: string}>}
+ * @returns {Promise<{browser: import('puppeteer').Browser, page: import('puppeteer').Page, sessionDir: string, collectedConsoleLogs: Array<object>, collectedRequests: Array<object>}>} // <-- MODIFIED: Added return types
  */
 async function launchBrowserWithRetries({
   retries = 3,
@@ -42,24 +42,27 @@ async function launchBrowserWithRetries({
   for (let i = 0; i < retries; i++) {
     let browser;
     try {
+      // <-- MODIFIED: Increased Puppeteer launch timeout to 2 minutes
       browser = await puppeteer.launch({
         headless: 'new',
-        // FIX: Add no-sandbox args for containerized environments and increase timeout
         args: [
             ...LAUNCH_ARGS,
             '--no-sandbox',
             '--disable-setuid-sandbox'
         ],
-        timeout: 60000, // 60 seconds
+        timeout: 120000, // 120 seconds = 2 minutes
         executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
       });
 
       const page = await browser.newPage();
       const sessionDir = path.join(__dirname, '../../sessions', String(sessionId));
       fs.mkdirSync(sessionDir, { recursive: true });
-      
+
+      // <-- NEW: Arrays to collect console logs and network requests
+      const collectedConsoleLogs = [];
+      const collectedRequests = [];
+
       // ========== SET VIEWPORT ==========
-      // Set a default viewport to prevent "0 width" screenshot errors
       await page.setViewport({ width: 1280, height: 800 });
 
 
@@ -94,52 +97,108 @@ async function launchBrowserWithRetries({
         });
       }
 
-      // ========== REQUEST/RESPONSE LOGGING ==========
-      const requests = [];
+      // ========== REQUEST/RESPONSE LOGGING (Collects into collectedRequests) ==========
       page.on('requestfinished', async (req) => {
         const res = req.response();
-        // Guard against null responses, which can happen for aborted requests, etc.
         if (!res) return;
         const entry = {
           url: req.url(),
           method: req.method(),
           status: res.status(),
           headers: res.headers(),
+          // Add body/response if needed and configured in options
         };
-        requests.push(entry);
+        collectedRequests.push(entry); // <-- Collect here
         debug && logger.debug(`REQ ${entry.status} ${entry.method} ${entry.url}`);
       });
 
-      // ========== JS CONSOLE LOGGING ==========
+      // ========== JS CONSOLE LOGGING (ENHANCED for JSHandle@error) ==========
       page.on('console', async (msg) => {
-        const type = msg.type();
+        const type = msg.type(); // e.g., 'log', 'error', 'warn', 'info', 'debug'
+        const location = msg.location(); // Get source location
+        const messageEntry = {
+          type: type,
+          text: msg.text(), // Raw text of the console message (useful fallback)
+          timestamp: Date.now(),
+          args: [], // Processed arguments
+          url: location?.url || '',
+          lineNumber: location?.lineNumber || -1,
+          columnNumber: location?.columnNumber || -1,
+        };
+
         try {
-          const args = await Promise.all(msg.args().map(arg => arg.jsonValue()));
-          let fullMsg = ''; 
-          for (const arg of args) {
-            if (typeof arg === 'object' && arg !== null) {
-              // Stringify objects/errors to get a meaningful message
-              fullMsg += JSON.stringify(arg, Object.getOwnPropertyNames(arg)) + ' ';
+          for (const arg of msg.args()) {
+            if (arg.asElement()) { // Check if it's an element handle (e.g., console.log(document.body))
+              try {
+                messageEntry.args.push(await arg.asElement().outerHTML());
+              } catch (e) {
+                messageEntry.args.push(`[Element failed to serialize: ${e.message}]`);
+              }
             } else {
-              fullMsg += arg + ' ';
+              try {
+                // Attempt to get the JSON value for primitives and simple objects
+                const jsonVal = await arg.jsonValue();
+                messageEntry.args.push(jsonVal);
+              } catch (jsonErr) {
+                // If jsonValue() fails, it might be a complex object or an Error object.
+                // Try to get its string representation or specific properties.
+                const argString = arg.toString(); // e.g., "JSHandle@error"
+                if (argString.includes('JSHandle@object') || argString.includes('JSHandle@error')) {
+                  // Attempt to evaluate properties of the JSHandle directly in the page context
+                  const errorProps = await arg.evaluate(obj => {
+                    const props = {
+                      message: obj.message,
+                      stack: obj.stack,
+                      name: obj.name,
+                      // Add other error properties if needed, e.g., code, errno
+                    };
+                    // Filter out undefined/null properties for cleaner output
+                    return Object.fromEntries(Object.entries(props).filter(([, v]) => v != null));
+                  }).catch(() => null); // Catch if evaluation fails (e.g., handle is gone)
+
+                  if (errorProps && (errorProps.message || errorProps.stack)) {
+                    // We got specific error properties!
+                    messageEntry.args.push({ error: errorProps.message, stack: errorProps.stack, name: errorProps.name });
+                  } else {
+                    // Fallback for other complex JSHandles if specific properties couldn't be extracted
+                    messageEntry.args.push(argString);
+                  }
+                } else {
+                  // Fallback for any other JSHandle that jsonValue failed on (less common)
+                  messageEntry.args.push(argString);
+                }
+              }
             }
           }
+          collectedConsoleLogs.push(messageEntry); // <-- Collect the processed message here
 
+          // Keep your server-side logger calls if you want them in your backend logs too
+          const formattedArgs = messageEntry.args.map(a => typeof a === 'object' && a !== null ? JSON.stringify(a) : String(a)).join(' ');
           if (type === 'error') {
-            logger.error(`Console error: ${fullMsg.trim()}`);
+            logger.error(`Console error from page: ${formattedArgs} (at ${messageEntry.url}:${messageEntry.lineNumber})`);
           } else {
-            logger.info(`[${type}] ${fullMsg.trim()}`);
+            logger.info(`[${type}] Console from page: ${formattedArgs} (at ${messageEntry.url}:${messageEntry.lineNumber})`);
           }
-        } catch (err) {
-          logger.warn(`Failed to serialize console message: ${err.message}`);
-          logger.warn(`Raw console message text: ${msg.text()}`);
+
+        } catch (argProcessingErr) {
+          logger.warn(`Error processing console argument for logging: ${argProcessingErr.message}. Raw message: ${msg.text()}`);
+          collectedConsoleLogs.push({ type: type, text: msg.text(), timestamp: Date.now(), args: [`Failed to process: ${argProcessingErr.message}`] });
         }
       });
 
-      // ========== PAGE ERROR HANDLING ==========
-      // Handles errors thrown within the page's context (e.g., window.onerror)
+      // ========== PAGE ERROR HANDLING (unhandled exceptions in page context) ==========
       page.on('pageerror', async (err) => {
-        logger.error(`Page error: ${err.message}`);
+        logger.error(`Page unhandled error: ${err.message}. Stack: ${err.stack}`);
+        // Also add to collected logs for frontend display
+        collectedConsoleLogs.push({
+          type: 'error',
+          text: `Page Unhandled Error: ${err.message}`,
+          timestamp: Date.now(),
+          args: [{ error: err.message, stack: err.stack, name: err.name || 'Error' }],
+          url: err.url || '', // `err` object often has url/line/column for pageerror
+          lineNumber: err.lineNumber || -1,
+          columnNumber: err.columnNumber || -1,
+        });
         const screenshotPath = path.join(sessionDir, `pageerror-${Date.now()}.png`);
         try {
           if (!page.isClosed()) {
@@ -153,10 +212,16 @@ async function launchBrowserWithRetries({
         }
       });
 
-      // ========== UNCAUGHT EXCEPTION HANDLING ==========
-      // Catches uncaught exceptions from the page (different from pageerror)
+      // ========== UNCAUGHT EXCEPTION HANDLING (from Puppeteer process itself) ==========
       page.on('error', async (err) => {
-          logger.error(`Unhandled exception in page: ${err.message}`);
+          logger.error(`Unhandled exception in Puppeteer page process: ${err.message}`);
+          collectedConsoleLogs.push({ // Also collect for frontend display
+            type: 'error',
+            text: `Puppeteer Process Error: ${err.message}`,
+            timestamp: Date.now(),
+            args: [{ error: err.message, stack: err.stack, name: err.name || 'Error' }],
+            url: '', lineNumber: -1, columnNumber: -1, // No specific page location here
+          });
           const screenshotPath = path.join(sessionDir, `uncaught-exception-${Date.now()}.png`);
           try {
               if (!page.isClosed()) {
@@ -171,27 +236,81 @@ async function launchBrowserWithRetries({
       });
 
 
-      // ========== SAVE LOGS ON CLOSE ==========
+      // ========== SAVE LOGS ON CLOSE (This is for backend internal saving, frontend gets via return) ==========
       page.on('close', () => {
         try {
           fs.writeFileSync(
             path.join(sessionDir, 'network-log.json'),
-            JSON.stringify(requests, null, 2)
+            JSON.stringify(collectedRequests, null, 2) // Use collectedRequests
+          );
+          fs.writeFileSync( // Save console logs too
+            path.join(sessionDir, 'console-log.json'),
+            JSON.stringify(collectedConsoleLogs, null, 2)
           );
         } catch (writeErr) {
-          logger.error(`Failed to write network-log: ${writeErr.message}`);
+          logger.error(`Failed to write session logs: ${writeErr.message}`);
         }
       });
 
-      return { browser, page, sessionDir };
+      // <-- MODIFIED: Return collected logs and requests
+      return { browser, page, sessionDir, collectedConsoleLogs, collectedRequests };
 
     } catch (err) {
       logger.warn(`Launch attempt ${i + 1}/${retries} failed: ${err.message}`);
       if (browser) await browser.close(); // Ensure browser is closed on failure
-      if (i === retries - 1) throw new Error(`Failed to launch browser after ${retries} attempts: ${err.message}`);
+      // <-- MODIFIED: Throw a more detailed error object on final failure
+      if (i === retries - 1) {
+        throw {
+          name: 'PuppeteerLaunchError',
+          message: `Failed to launch browser after ${retries} attempts: ${err.message}`,
+          details: err.stack,
+        };
+      }
       await new Promise((r) => setTimeout(r, 2000));
     }
   }
 }
 
-module.exports = { launchBrowserWithRetries };
+// Dummy analyzeUrl function (YOU NEED TO IMPLEMENT THIS if it's separate)
+// This function should call launchBrowserWithRetries and process its results.
+// For example:
+async function analyzeUrl(url, options) {
+  let browser = null;
+  try {
+    const { browser: launchedBrowser, page, collectedConsoleLogs, collectedRequests } = await launchBrowserWithRetries(options);
+    browser = launchedBrowser; // Assign to outer scope for finally block
+    await page.goto(url, { waitUntil: 'networkidle0', timeout: options.navigationTimeout || 60000 });
+
+    // Perform your analysis here:
+    const title = await page.title();
+    const html = options.includeHtml ? await page.content() : '';
+    const screenshot = options.includeScreenshot ? await page.screenshot({ encoding: 'base64', fullPage: true }) : '';
+    // ... calculate other metrics (DOM, performance, etc.)
+
+    return {
+      title,
+      html,
+      screenshot,
+      logs: collectedConsoleLogs, // <-- Pass collected logs
+      requests: collectedRequests, // <-- Pass collected requests
+      // ... other analysis results
+      error: null, // No error on success
+    };
+  } catch (err) {
+    logger.error(`Error in analyzeUrl for ${url}: ${err.message}. Details: ${err.stack}`);
+    // <-- MODIFIED: Return a structured error for frontend
+    return {
+      error: 'Analysis Failed',
+      message: err.message, // The message from PuppeteerLaunchError or other
+      details: err.stack || (err.details ? err.details : 'No stack/details available'),
+    };
+  } finally {
+    if (browser) {
+      await browser.close();
+      logger.info('Browser closed.');
+    }
+  }
+}
+
+
+module.exports = { launchBrowserWithRetries, analyzeUrl }; // <-- MODIFIED: Export analyzeUrl
