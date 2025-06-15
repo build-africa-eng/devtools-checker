@@ -1,12 +1,15 @@
 const express = require('express');
 const rateLimit = require('express-rate-limit');
 const NodeCache = require('node-cache');
-const analyzeUrl = require('../utils/puppeteer');
+const analyzeUrl = require('../utils/puppeteer'); // This should be your analyzeUrl function
 const isValidUrl = require('../utils/isValidUrl');
-const logger = require('../utils/logger');
+const logger = require('../utils/logger'); // Assuming you have a logger utility
 
 const router = express.Router();
 const cache = new NodeCache({ stdTTL: 600, checkperiod: 120 });
+
+// Determine environment
+const isProduction = process.env.NODE_ENV === 'production'; // <-- NEW: Check NODE_ENV
 
 const limiter = rateLimit({
   windowMs: 1 * 60 * 1000,
@@ -25,7 +28,6 @@ const allowedOptions = [
   'navigationTimeout', 'networkConditionsType', 'inspectElement', 'filterRequestTypes',
   'filterDomains', 'executeScript', 'debug', 'enableWebSocket', 'cpuThrottlingRate',
   'followLinks', 'maxLinks', 'requestTimeout', 'outputDir',
-  // Add new options for DOM and performance
   'includeDomMetrics', 'includePerformanceMetrics',
 ];
 
@@ -71,17 +73,17 @@ router.post('/', limiter, async (req, res) => {
   try {
     logger.request(req, `Analysis started: ${url}`, 'info', { options });
 
-    // Default to including DOM and performance metrics
     const analysisOptions = {
       ...options,
-      includeDomMetrics: options.includeDomMetrics !== false, // Default to true
-      includePerformanceMetrics: options.includePerformanceMetrics !== false, // Default to true
+      includeDomMetrics: options.includeDomMetrics !== false,
+      includePerformanceMetrics: options.includePerformanceMetrics !== false,
       debug: options.debug || true,
     };
 
     const analysisPromise = analyzeUrl(url, analysisOptions);
     const timeoutPromise = new Promise((_, reject) =>
-      setTimeout(() => reject(new Error('Analysis timed out')), 60000)
+      // <-- MODIFIED: Increased timeout for analysis to 3 minutes
+      setTimeout(() => reject(new Error('Analysis timed out')), 180000) // 180 seconds = 3 minutes
     );
     const analysisData = await Promise.race([analysisPromise, timeoutPromise]);
 
@@ -89,8 +91,8 @@ router.post('/', limiter, async (req, res) => {
       logger.request(req, `Analysis failed: ${url} | ${analysisData.error}`, 'error');
       return res.status(500).json({
         error: 'Analysis failed',
-        message: analysisData.error,
-        details: analysisData.details,
+        message: analysisData.message || analysisData.error, // Use message field if available
+        details: analysisData.details, // Pass along details (e.g., stack trace)
       });
     }
 
@@ -99,8 +101,8 @@ router.post('/', limiter, async (req, res) => {
       title: analysisData.title || 'Untitled Page',
       html: analysisData.html || '',
       screenshot: analysisData.screenshot || '',
-      logs: Array.isArray(analysisData.logs) ? analysisData.logs : [],
-      requests: Array.isArray(analysisData.requests) ? analysisData.requests : [],
+      logs: Array.isArray(analysisData.logs) ? analysisData.logs : [], // <-- Logs from Puppeteer
+      requests: Array.isArray(analysisData.requests) ? analysisData.requests : [], // <-- Requests from Puppeteer
       performance: analysisData.performance || { domContentLoaded: -1, load: -1, firstPaint: -1, largestContentfulPaint: -1 },
       domMetrics: analysisData.domMetrics || {},
       warning: analysisData.warning || null,
@@ -114,10 +116,20 @@ router.post('/', limiter, async (req, res) => {
     return res.json(safeJson(responseData));
   } catch (error) {
     logger.request(req, `Unexpected error: ${url} | ${error.stack || error.message}`, 'error');
-    return res.status(500).json({
-      error: 'Analysis failed',
-      message: 'An unexpected server error occurred.',
-    });
+
+    // <-- MODIFIED: Conditionally send detailed error in development
+    if (!isProduction) {
+      return res.status(500).json({
+        error: 'Analysis failed (Backend Error)',
+        message: error.message,
+        details: error.stack,
+      });
+    } else {
+      return res.status(500).json({
+        error: 'Analysis failed',
+        message: 'An unexpected server error occurred.',
+      });
+    }
   }
 });
 
@@ -131,12 +143,15 @@ router.get('/', limiter, async (req, res) => {
 
   try {
     logger.request(req, `GET analysis started: ${url}`, 'info');
+    // Ensure `analyzeUrl` returns similar structured data for GET requests
     const analysisData = await analyzeUrl(url, { debug: true, includeDomMetrics: true, includePerformanceMetrics: true });
+
     if (analysisData.error) {
       logger.request(req, `GET analysis failed: ${url} | ${analysisData.error}`, 'error');
       return res.status(500).json({
         error: 'Analysis failed',
-        message: analysisData.error,
+        message: analysisData.message || analysisData.error,
+        details: analysisData.details,
       });
     }
 
@@ -144,8 +159,8 @@ router.get('/', limiter, async (req, res) => {
       title: analysisData.title || 'Untitled Page',
       html: analysisData.html || '',
       screenshot: analysisData.screenshot || '',
-      logs: Array.isArray(analysisData.logs) ? analysisData.logs : [],
-      requests: Array.isArray(analysisData.requests) ? analysisData.requests : [],
+      logs: Array.isArray(analysisData.logs) ? analysisData.logs : [], // <-- Logs from Puppeteer
+      requests: Array.isArray(analysisData.requests) ? analysisData.requests : [], // <-- Requests from Puppeteer
       performance: analysisData.performance || { domContentLoaded: -1, load: -1, firstPaint: -1, largestContentfulPaint: -1 },
       domMetrics: analysisData.domMetrics || {},
       warning: analysisData.warning || null,
@@ -157,7 +172,16 @@ router.get('/', limiter, async (req, res) => {
     return res.json(safeJson(responseData));
   } catch (error) {
     logger.request(req, `Unexpected GET error: ${url} | ${error.stack || error.message}`, 'error');
-    return res.status(500).json({ error: 'Internal server error' });
+    // <-- MODIFIED: Conditionally send detailed error in development for GET
+    if (!isProduction) {
+      return res.status(500).json({
+        error: 'Internal server error (Backend GET Error)',
+        message: error.message,
+        details: error.stack,
+      });
+    } else {
+      return res.status(500).json({ error: 'Internal server error' });
+    }
   }
 });
 
