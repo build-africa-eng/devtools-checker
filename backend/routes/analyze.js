@@ -9,7 +9,7 @@ const router = express.Router();
 const cache = new NodeCache({ stdTTL: 600, checkperiod: 120 });
 
 // Determine environment
-const isProduction = process.env.NODE_ENV === 'production'; // <-- NEW: Check NODE_ENV
+const isProduction = process.env.NODE_ENV === 'production'; // Check NODE_ENV
 
 const limiter = rateLimit({
   windowMs: 1 * 60 * 1000,
@@ -82,8 +82,8 @@ router.post('/', limiter, async (req, res) => {
 
     const analysisPromise = analyzeUrl(url, analysisOptions);
     const timeoutPromise = new Promise((_, reject) =>
-      // <-- MODIFIED: Increased timeout for analysis to 3 minutes
-      setTimeout(() => reject(new Error('Analysis timed out')), 180000) // 180 seconds = 3 minutes
+      // Increased timeout to 5 minutes (300 seconds)
+      setTimeout(() => reject(new Error('Analysis timed out')), 300000)
     );
     const analysisData = await Promise.race([analysisPromise, timeoutPromise]);
 
@@ -91,8 +91,25 @@ router.post('/', limiter, async (req, res) => {
       logger.request(req, `Analysis failed: ${url} | ${analysisData.error}`, 'error');
       return res.status(500).json({
         error: 'Analysis failed',
-        message: analysisData.message || analysisData.error, // Use message field if available
-        details: analysisData.details, // Pass along details (e.g., stack trace)
+        message: analysisData.message || analysisData.error,
+        details: analysisData.details,
+      });
+    }
+
+    // Handle fallback case from launchBrowserWithRetries
+    if (!analysisData.logs && !analysisData.requests) {
+      logger.request(req, `Analysis fallback triggered for ${url} due to initialization failure`, 'warn');
+      return res.status(200).json({
+        title: 'Analysis Incomplete',
+        html: '',
+        screenshot: '',
+        logs: [],
+        requests: [],
+        performance: { domContentLoaded: -1, load: -1, firstPaint: -1, largestContentfulPaint: -1 },
+        domMetrics: {},
+        warning: 'Analysis completed with limited data due to initialization issues.',
+        webSocket: null,
+        summary: { errors: 0, warnings: 0, requests: 0, loadTime: 0 },
       });
     }
 
@@ -101,8 +118,8 @@ router.post('/', limiter, async (req, res) => {
       title: analysisData.title || 'Untitled Page',
       html: analysisData.html || '',
       screenshot: analysisData.screenshot || '',
-      logs: Array.isArray(analysisData.logs) ? analysisData.logs : [], // <-- Logs from Puppeteer
-      requests: Array.isArray(analysisData.requests) ? analysisData.requests : [], // <-- Requests from Puppeteer
+      logs: Array.isArray(analysisData.logs) ? analysisData.logs : [],
+      requests: Array.isArray(analysisData.requests) ? analysisData.requests : [],
       performance: analysisData.performance || { domContentLoaded: -1, load: -1, firstPaint: -1, largestContentfulPaint: -1 },
       domMetrics: analysisData.domMetrics || {},
       warning: analysisData.warning || null,
@@ -117,7 +134,6 @@ router.post('/', limiter, async (req, res) => {
   } catch (error) {
     logger.request(req, `Unexpected error: ${url} | ${error.stack || error.message}`, 'error');
 
-    // <-- MODIFIED: Conditionally send detailed error in development
     if (!isProduction) {
       return res.status(500).json({
         error: 'Analysis failed (Backend Error)',
@@ -143,7 +159,6 @@ router.get('/', limiter, async (req, res) => {
 
   try {
     logger.request(req, `GET analysis started: ${url}`, 'info');
-    // Ensure `analyzeUrl` returns similar structured data for GET requests
     const analysisData = await analyzeUrl(url, { debug: true, includeDomMetrics: true, includePerformanceMetrics: true });
 
     if (analysisData.error) {
@@ -159,8 +174,8 @@ router.get('/', limiter, async (req, res) => {
       title: analysisData.title || 'Untitled Page',
       html: analysisData.html || '',
       screenshot: analysisData.screenshot || '',
-      logs: Array.isArray(analysisData.logs) ? analysisData.logs : [], // <-- Logs from Puppeteer
-      requests: Array.isArray(analysisData.requests) ? analysisData.requests : [], // <-- Requests from Puppeteer
+      logs: Array.isArray(analysisData.logs) ? analysisData.logs : [],
+      requests: Array.isArray(analysisData.requests) ? analysisData.requests : [],
       performance: analysisData.performance || { domContentLoaded: -1, load: -1, firstPaint: -1, largestContentfulPaint: -1 },
       domMetrics: analysisData.domMetrics || {},
       warning: analysisData.warning || null,
@@ -172,7 +187,6 @@ router.get('/', limiter, async (req, res) => {
     return res.json(safeJson(responseData));
   } catch (error) {
     logger.request(req, `Unexpected GET error: ${url} | ${error.stack || error.message}`, 'error');
-    // <-- MODIFIED: Conditionally send detailed error in development for GET
     if (!isProduction) {
       return res.status(500).json({
         error: 'Internal server error (Backend GET Error)',
