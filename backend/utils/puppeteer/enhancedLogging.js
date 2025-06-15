@@ -14,7 +14,7 @@ async function processConsoleArg(arg, debug = false) {
     const subtype = remoteObj.subtype;
 
     if (type === 'undefined') return { value: undefined, type };
-    if (type === 'function') return { value: '[Function]', type, code: await arg.getProperty('toString').then(p => p.jsonValue()) };
+    if (type === 'function') return { value: '[Function]', type, code: await arg.getProperty('toString').then(p => p.jsonValue()).catch(() => '[Code unavailable]') };
     if (type === 'symbol') return { value: '[Symbol]', type };
     if (type === 'bigint') return { value: remoteObj.value + 'n', type };
     if (type === 'object' || type === 'function') {
@@ -22,7 +22,7 @@ async function processConsoleArg(arg, debug = false) {
         const errVal = await arg.evaluate(e => ({
           name: e.name,
           message: e.message,
-          stack: e.stack || new Error().stack, // Fallback to current stack
+          stack: e.stack || new Error().stack,
           isIndexedDB: e.message?.includes('IndexedDB'),
           isAbortError: e.name === 'AbortError' || e.message?.includes('AbortError'),
         })).catch(() => ({
@@ -44,12 +44,10 @@ async function processConsoleArg(arg, debug = false) {
         };
       }
 
-      // Handle objects, arrays, and scripts
       const val = await arg.jsonValue().catch(err => {
         logger.warn(`JSON value failed: ${err.message}`, { remoteObj });
         return { error: err.message, raw: remoteObj.description };
       });
-      if (debug) return { value: val, type, subtype, raw: remoteObj };
       return {
         value: typeof val === 'object' ? util.inspect(val, { depth: null }) : val,
         type,
@@ -66,7 +64,7 @@ async function processConsoleArg(arg, debug = false) {
 }
 
 /**
- * Logs a console message with full details in JSON format.
+ * Logs a console message with full details in JSON format, handling undefined args.
  * @param {object} msg
  * @param {string} msg.type
  * @param {string} msg.text
@@ -80,9 +78,9 @@ async function processConsoleArg(arg, debug = false) {
  * @param {boolean} debug
  */
 function formatAndLogMessage(msg, debug = false) {
-  const location = `${msg.url}:${msg.lineNumber}:${msg.columnNumber}`;
-  const timestamp = new Date(msg.timestamp).toISOString();
-  const context = msg.frameUrl && msg.frameUrl !== msg.url ? ` (frame: ${msg.frameUrl})` : '';
+  const location = `${msg.url || ''}:${msg.lineNumber || -1}:${msg.columnNumber || -1}`;
+  const timestamp = new Date(msg.timestamp || Date.now()).toISOString();
+  const context = msg.frameUrl && msg.frameUrl !== (msg.url || '') ? ` (frame: ${msg.frameUrl})` : '';
 
   const logEntry = {
     level: msg.type === 'error' ? 'error' : msg.type === 'warn' ? 'warn' : msg.type === 'info' ? 'info' : 'debug',
@@ -92,14 +90,14 @@ function formatAndLogMessage(msg, debug = false) {
     columnNumber: msg.columnNumber || -1,
     frameId: msg.frameId || 'main',
     frameUrl: msg.frameUrl || '',
-    timestamp: msg.timestamp,
+    timestamp: msg.timestamp || Date.now(),
     isoTimestamp: timestamp,
     context,
-    args: msg.args || [],
+    args: Array.isArray(msg.args) ? msg.args : [], // Ensure args is always an array
   };
 
   // Enhance for errors with detailed context
-  const errorArg = msg.args.find(arg => arg?.error);
+  const errorArg = (Array.isArray(msg.args) ? msg.args : []).find(arg => arg?.error);
   if (errorArg) {
     logEntry.errorDetails = {
       message: errorArg.message || msg.text,
@@ -108,7 +106,7 @@ function formatAndLogMessage(msg, debug = false) {
       isIndexedDB: errorArg.isIndexedDB || false,
       isAbortError: errorArg.isAbortError || false,
       raw: errorArg.raw || '',
-      args: msg.args.map(arg => (typeof arg === 'object' ? util.inspect(arg, { depth: null }) : String(arg))),
+      args: (Array.isArray(msg.args) ? msg.args : []).map(arg => (typeof arg === 'object' ? util.inspect(arg, { depth: null }) : String(arg))),
     };
     logEntry.message = `Enhanced ${msg.type.toUpperCase()}: ${logEntry.message}`;
   }
