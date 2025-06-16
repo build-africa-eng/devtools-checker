@@ -35,7 +35,7 @@ async function launchBrowserWithRetries({
         ],
         ignoreHTTPSErrors: true, // Bypass network errors
         timeout: 120000,
-        protocolTimeout: 30000, // Reduced to 30 seconds since network is disabled
+        protocolTimeout: 600000, // Reduced to 30 seconds since network is disabled
         executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
       });
       const endTime = Date.now();
