@@ -2,46 +2,46 @@ const fs = require('fs');
 const path = require('path');
 
 /**
- * Saves a combined HTML report with screenshot and results embedded.
- * @param {object} options
- * @param {string} options.title - Title of the report.
- * @param {string} options.outputDir - Directory to save the report in.
- * @param {object} options.data - JSON results (violations or audits).
- * @param {string} options.screenshotPath - Path to the PNG screenshot.
- * @param {string} [options.filename] - Optional override filename.
+ * Generates a simple HTML report that includes a screenshot and summary JSON.
+ * @param {Object} params
+ * @param {string} params.title - Report title (e.g., 'Lighthouse', 'Accessibility')
+ * @param {string} params.outputDir - Where to save the report
+ * @param {object} params.data - Summary JSON data
+ * @param {string} params.screenshotPath - Path to PNG screenshot
+ * @returns {string} Full path to saved HTML file
  */
-function saveCombinedReport({ title, outputDir, data, screenshotPath, filename = null }) {
+function saveCombinedReport({ title, outputDir, data, screenshotPath }) {
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-  const reportFile = filename || `${title.toLowerCase().replace(/\s+/g, '-')}-report-${timestamp}.html`;
+  const filename = `${title.toLowerCase()}-report-${timestamp}.html`;
+  const filepath = path.join(outputDir, filename);
 
-  const screenshotBase64 = fs.readFileSync(screenshotPath).toString('base64');
-  const screenshotTag = `<img src="data:image/png;base64,${screenshotBase64}" style="max-width: 100%; border: 1px solid #ccc;" />`;
+  const relativeScreenshot = path.basename(screenshotPath);
+  const escapedJSON = JSON.stringify(data, null, 2).replace(/</g, '\\u003c');
 
-  const html = `
-<!DOCTYPE html>
+  const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>${title} Report</title>
   <style>
-    body { font-family: sans-serif; margin: 2rem; }
-    pre { background: #f9f9f9; padding: 1rem; border: 1px solid #ccc; overflow-x: auto; }
-    h2 { margin-top: 2rem; }
+    body { font-family: sans-serif; padding: 2em; }
+    h1 { color: #333; }
+    pre { background: #f5f5f5; padding: 1em; overflow: auto; }
+    img { max-width: 100%; border: 1px solid #ccc; margin-top: 1em; }
   </style>
 </head>
 <body>
-  <h1>${title} Report</h1>
-  <p>Generated: ${new Date().toLocaleString()}</p>
+  <h1>${title} Report - ${new Date().toLocaleString()}</h1>
   <h2>Screenshot</h2>
-  ${screenshotTag}
-  <h2>Audit Data</h2>
-  <pre>${JSON.stringify(data, null, 2)}</pre>
+  <img src="./${relativeScreenshot}" alt="Screenshot" />
+  <h2>JSON Summary</h2>
+  <pre><code>${escapedJSON}</code></pre>
 </body>
-</html>`.trim();
+</html>`;
 
-  const outputPath = path.join(outputDir, reportFile);
-  fs.writeFileSync(outputPath, html, 'utf-8');
-  return outputPath;
+  fs.writeFileSync(filepath, html, 'utf-8');
+  return filepath;
 }
 
 module.exports = { saveCombinedReport };
