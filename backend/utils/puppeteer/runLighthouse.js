@@ -3,7 +3,7 @@ const { URL } = require('url');
 const logger = require('../logger');
 const path = require('path');
 const fs = require('fs');
-const { saveCombinedReport } = require('../utils/saveCombinedReport');
+const { saveCombinedReport } = require('../saveCombinedReport');
 
 /**
  * Runs a Lighthouse audit using Puppeteer browser + page.
