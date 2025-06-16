@@ -11,7 +11,7 @@ async function setupNetworkCapture(page, options, wsServer) {
     maxRequests = 500,
     filterRequestTypes = ['document', 'xhr', 'fetch', 'script'],
     filterDomains = [],
-    requestTimeout = 100000,
+    requestTimeout = 240000,
     outputDir = './analysis',
     enableWebSocket = false,
   } = options;
@@ -78,7 +78,7 @@ async function setupNetworkCapture(page, options, wsServer) {
           const buf = await Promise.race([
             res.buffer(),
             new Promise((_, reject) =>
-              setTimeout(() => reject(new Error('Response buffer timed out')), 10000)
+              setTimeout(() => reject(new Error('Response buffer timed out')), 240000)
             ),
           ]);
           requestData.size = buf.length;
