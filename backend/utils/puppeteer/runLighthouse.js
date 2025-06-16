@@ -16,7 +16,7 @@ async function runLighthouse(page, browser, debug = false, flags = {}) {
 
     const endpointURL = new URL(browser.wsEndpoint());
 
-    const DEFAULT_TIMEOUT = 60000;
+    const DEFAULT_TIMEOUT = 300000;
 
     const config = {
       port: parseInt(endpointURL.port, 10),
