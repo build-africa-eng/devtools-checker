@@ -83,7 +83,7 @@ router.post('/', limiter, async (req, res) => {
     const analysisPromise = analyzeUrl(url, analysisOptions);
     const timeoutPromise = new Promise((_, reject) =>
       // Increased timeout to 5 minutes (300 seconds)
-      setTimeout(() => reject(new Error('Analysis timed out')), 300000)
+      setTimeout(() => reject(new Error('Analysis timed out')), 600000)
     );
     const analysisData = await Promise.race([analysisPromise, timeoutPromise]);
 
