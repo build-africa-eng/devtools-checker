@@ -10,19 +10,20 @@ const { OPEN } = require('ws');
  * @param {object} options
  * @param {boolean} [options.debug=false]
  * @param {WebSocket.Server|null} [options.wsServer=null]
- * @param {string|null} [options.outputDir=null] - Directory to save results (JSON).
+ * @param {string|null} [options.outputDir=null] - Directory to save results.
+ * @param {string} [options.minImpact=null] - Minimum impact level to include (e.g., 'moderate').
  * @returns {Promise<object>} AXE results with a summary and violations.
  */
 async function runAccessibility(page, {
   debug = false,
   wsServer = null,
-  outputDir = null
+  outputDir = null,
+  minImpact = null,
 } = {}) {
   try {
     if (!page) throw new Error('Invalid page instance');
 
     const axe = new AxePuppeteer(page);
-
     const results = await Promise.race([
       axe.analyze(),
       new Promise((_, reject) =>
@@ -30,7 +31,16 @@ async function runAccessibility(page, {
       ),
     ]);
 
-    const { violations = [] } = results;
+    let { violations = [] } = results;
+
+    // Filter by min impact if specified
+    if (minImpact) {
+      const levels = ['minor', 'moderate', 'serious', 'critical'];
+      const minIndex = levels.indexOf(minImpact);
+      if (minIndex >= 0) {
+        violations = violations.filter(v => levels.indexOf(v.impact) >= minIndex);
+      }
+    }
 
     const summary = {
       totalViolations: violations.length,
@@ -49,7 +59,7 @@ async function runAccessibility(page, {
       logger.info(`Accessibility audit completed with ${violations.length} violations`);
     }
 
-    // Send via WebSocket
+    // WebSocket broadcast
     if (wsServer) {
       wsServer.clients.forEach(client => {
         if (client.readyState === OPEN) {
@@ -60,9 +70,10 @@ async function runAccessibility(page, {
 
     // Save to disk
     if (outputDir) {
-      const outPath = path.join(outputDir, 'axe-results.json');
-      fs.writeFileSync(outPath, JSON.stringify(results, null, 2), 'utf-8');
-      if (debug) logger.info(`Accessibility report saved to ${outPath}`);
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+      fs.writeFileSync(path.join(outputDir, `axe-results-${timestamp}.json`), JSON.stringify(results, null, 2), 'utf-8');
+      fs.writeFileSync(path.join(outputDir, `axe-summary-${timestamp}.json`), JSON.stringify(summary, null, 2), 'utf-8');
+      if (debug) logger.info(`Accessibility reports saved to ${outputDir}`);
     }
 
     return { summary, violations };
