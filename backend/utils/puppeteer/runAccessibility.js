@@ -26,7 +26,7 @@ async function runAccessibility(page, {
     const results = await Promise.race([
       axe.analyze(),
       new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('Accessibility audit timed out')), 100000)
+        setTimeout(() => reject(new Error('Accessibility audit timed out')), 300000)
       ),
     ]);
 
