@@ -1,5 +1,7 @@
 const lighthouse = require('lighthouse');
 const { URL } = require('url');
+const fs = require('fs');
+const path = require('path');
 const logger = require('../logger');
 
 /**
@@ -7,7 +9,7 @@ const logger = require('../logger');
  * @param {import('puppeteer').Page} page - Puppeteer page instance.
  * @param {import('puppeteer').Browser} browser - Puppeteer browser instance.
  * @param {boolean} [debug=false] - Enable verbose logging.
- * @param {object} [flags={}] - Additional Lighthouse flags.
+ * @param {object} [flags={}] - Additional Lighthouse flags (can include outputPath).
  * @returns {Promise<object>} Result with scores, audits, or an error.
  */
 async function runLighthouse(page, browser, debug = false, flags = {}) {
@@ -15,21 +17,19 @@ async function runLighthouse(page, browser, debug = false, flags = {}) {
     if (!page || !browser) throw new Error('Invalid page or browser instance');
 
     const endpointURL = new URL(browser.wsEndpoint());
+    const url = page.url();
 
-    const DEFAULT_TIMEOUT = 300000;
+    if (!url || url === 'about:blank') {
+      throw new Error('Cannot run Lighthouse on an invalid or blank page.');
+    }
 
     const config = {
       port: parseInt(endpointURL.port, 10),
       output: 'json',
       logLevel: debug ? 'info' : 'error',
-      timeout: flags.timeout || DEFAULT_TIMEOUT,
-      ...flags, // Support overrides like onlyCategories, emulation, etc.
+      timeout: flags.timeout || 300000,
+      ...flags
     };
-
-    const url = page.url();
-    if (!url || url === 'about:blank') {
-      throw new Error('Cannot run Lighthouse on an invalid or blank page.');
-    }
 
     if (debug) logger.info(`Running Lighthouse audit on ${url} with config: ${JSON.stringify(config)}`);
 
@@ -41,6 +41,13 @@ async function runLighthouse(page, browser, debug = false, flags = {}) {
       return { error: message };
     }
 
+    const result = {
+      url,
+      score: lhr.categories,
+      audits: lhr.audits,
+      timing: lhr.timing,
+    };
+
     if (debug) {
       logger.info(`Lighthouse audit completed for ${url}`);
       logger.info(`Scores: ${Object.entries(lhr.categories).map(
@@ -48,12 +55,18 @@ async function runLighthouse(page, browser, debug = false, flags = {}) {
       ).join(', ')}`);
     }
 
-    return {
-      url,
-      score: lhr.categories,
-      audits: lhr.audits,
-      timing: lhr.timing,
-    };
+    // Save report if outputPath provided
+    if (flags.outputPath) {
+      fs.writeFileSync(flags.outputPath, JSON.stringify(lhr, null, 2), 'utf-8');
+      if (debug) logger.info(`Lighthouse report saved to ${flags.outputPath}`);
+    } else if (flags.outputDir) {
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+      const outPath = path.join(flags.outputDir, `lighthouse-report-${timestamp}.json`);
+      fs.writeFileSync(outPath, JSON.stringify(lhr, null, 2), 'utf-8');
+      if (debug) logger.info(`Lighthouse report saved to ${outPath}`);
+    }
+
+    return result;
   } catch (err) {
     logger.error(`Lighthouse audit failed: ${err.message}`);
     return { error: err.message };
