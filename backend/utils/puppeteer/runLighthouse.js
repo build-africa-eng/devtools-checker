@@ -1,44 +1,44 @@
 const lighthouse = require('lighthouse');
 const { URL } = require('url');
-const fs = require('fs');
-const path = require('path');
 const logger = require('../logger');
+const path = require('path');
+const fs = require('fs');
+const { saveCombinedReport } = require('../utils/saveCombinedReport');
 
 /**
- * Runs a Lighthouse audit against the current Puppeteer page.
- * @param {import('puppeteer').Page} page - Puppeteer page instance.
- * @param {import('puppeteer').Browser} browser - Puppeteer browser instance.
- * @param {boolean} [debug=false] - Enable verbose logging.
- * @param {object} [flags={}] - Additional Lighthouse flags (can include outputPath).
- * @returns {Promise<object>} Result with scores, audits, or an error.
+ * Runs a Lighthouse audit using Puppeteer browser + page.
+ * @param {import('puppeteer').Page} page
+ * @param {import('puppeteer').Browser} browser
+ * @param {boolean} [debug=false]
+ * @param {object} [flags={}]
+ * @returns {Promise<object>} Lighthouse scores, audits, screenshot, or error.
  */
 async function runLighthouse(page, browser, debug = false, flags = {}) {
   try {
     if (!page || !browser) throw new Error('Invalid page or browser instance');
 
     const endpointURL = new URL(browser.wsEndpoint());
-    const url = page.url();
-
-    if (!url || url === 'about:blank') {
-      throw new Error('Cannot run Lighthouse on an invalid or blank page.');
-    }
+    const DEFAULT_TIMEOUT = 300000;
 
     const config = {
       port: parseInt(endpointURL.port, 10),
       output: 'json',
       logLevel: debug ? 'info' : 'error',
-      timeout: flags.timeout || 300000,
-      ...flags
+      timeout: flags.timeout || DEFAULT_TIMEOUT,
+      ...flags,
     };
 
-    if (debug) logger.info(`Running Lighthouse audit on ${url} with config: ${JSON.stringify(config)}`);
+    const url = page.url();
+    if (!url || url === 'about:blank') {
+      throw new Error('Cannot run Lighthouse on an invalid or blank page.');
+    }
+
+    if (debug) logger.info(`Running Lighthouse audit on ${url}`);
 
     const { lhr } = await lighthouse(url, config);
 
-    if (!lhr || !lhr.categories || !lhr.audits) {
-      const message = 'Lighthouse returned an incomplete report';
-      logger.error(message);
-      return { error: message };
+    if (!lhr?.categories || !lhr.audits) {
+      throw new Error('Lighthouse returned an incomplete report');
     }
 
     const result = {
@@ -48,22 +48,27 @@ async function runLighthouse(page, browser, debug = false, flags = {}) {
       timing: lhr.timing,
     };
 
-    if (debug) {
-      logger.info(`Lighthouse audit completed for ${url}`);
-      logger.info(`Scores: ${Object.entries(lhr.categories).map(
-        ([cat, val]) => `${cat}: ${(val.score * 100).toFixed(0)}`
-      ).join(', ')}`);
-    }
-
-    // Save report if outputPath provided
-    if (flags.outputPath) {
-      fs.writeFileSync(flags.outputPath, JSON.stringify(lhr, null, 2), 'utf-8');
-      if (debug) logger.info(`Lighthouse report saved to ${flags.outputPath}`);
-    } else if (flags.outputDir) {
+    // Save screenshot and HTML if outputDir given
+    if (flags.outputDir) {
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-      const outPath = path.join(flags.outputDir, `lighthouse-report-${timestamp}.json`);
-      fs.writeFileSync(outPath, JSON.stringify(lhr, null, 2), 'utf-8');
-      if (debug) logger.info(`Lighthouse report saved to ${outPath}`);
+      const jsonPath = path.join(flags.outputDir, `lighthouse-results-${timestamp}.json`);
+      const screenshotPath = path.join(flags.outputDir, `lighthouse-screenshot-${timestamp}.png`);
+
+      fs.writeFileSync(jsonPath, JSON.stringify(lhr, null, 2), 'utf-8');
+      await page.screenshot({ path: screenshotPath, fullPage: true });
+
+      const htmlPath = saveCombinedReport({
+        title: 'Lighthouse',
+        outputDir: flags.outputDir,
+        data: result,
+        screenshotPath
+      });
+
+      if (debug) {
+        logger.info(`Lighthouse JSON saved to ${jsonPath}`);
+        logger.info(`Screenshot saved to ${screenshotPath}`);
+        logger.info(`Combined HTML report saved to ${htmlPath}`);
+      }
     }
 
     return result;
