@@ -3,7 +3,7 @@ const path = require('path');
 const { AxePuppeteer } = require('@axe-core/puppeteer');
 const logger = require('../logger');
 const { OPEN } = require('ws');
-const { saveCombinedReport } = require('../utils/saveCombinedReport');
+const { saveCombinedReport } = require('../saveCombinedReport');
 
 /**
  * Runs an accessibility audit using axe-core/puppeteer.
