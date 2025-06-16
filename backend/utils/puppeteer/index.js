@@ -32,7 +32,7 @@ async function analyzeUrl(url, options = {}) {
       maxLogs = 200,
       maxRequests = 500,
       onlyImportantLogs = false,
-      navigationTimeout = 300000, // Increased to 60 seconds
+      navigationTimeout = 600000, // Increased to 60 seconds
       networkConditionsType = null, // Disabled network conditions
       inspectElement: inspectSelector = null,
       filterRequestTypes = ['document', 'xhr', 'fetch', 'script'],
@@ -43,7 +43,7 @@ async function analyzeUrl(url, options = {}) {
       cpuThrottlingRate = 1,
       followLinks = false,
       maxLinks = 5,
-      requestTimeout = 240000,
+      requestTimeout = 300000,
       outputDir = './analysis',
     } = options;
 
