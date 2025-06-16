@@ -31,7 +31,10 @@ return {
   raw: remoteObj.description,
 }; }
 
-return { value: remoteObj.value, type }; } catch (err) { logger.error(Failed to process arg: ${err.message}, { remoteObj: arg.remoteObject() }); return { error: err.message, type: 'processingError', raw: arg.toString() }; } }
+return { value: remoteObj.value, type }; } catch (err) {
+  logger.error(`Failed to process arg: ${err.message}`, { remoteObj: arg.remoteObject() });
+  return { error: err.message, type: 'processingError', raw: arg.toString() };
+}
 
 
 /**
