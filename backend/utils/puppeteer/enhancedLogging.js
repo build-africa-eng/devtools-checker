@@ -14,7 +14,22 @@ if (type === 'undefined') return { value: undefined, type }; if (type === 'funct
 
 if (type === 'object' || type === 'function') { if (subtype === 'error') { const errVal = await arg.evaluate(e => ({ name: e.name, message: e.message, stack: e.stack || new Error().stack, isIndexedDB: e.message?.includes('IndexedDB'), isAbortError: e.name === 'AbortError' || e.message?.includes('AbortError'), })).catch(() => ({ name: 'UnknownError', message: 'Error object inaccessible', stack: 'No stack trace available', isIndexedDB: remoteObj.description?.includes('IndexedDB'), isAbortError: remoteObj.description?.includes('AbortError'), })); return { error: true, name: errVal.name, message: errVal.message, stack: errVal.stack, isIndexedDB: errVal.isIndexedDB, isAbortError: errVal.isAbortError, type: 'errorObject', raw: remoteObj.description, code: errVal.isAbortError ? 'ABORT_ERROR' : errVal.isIndexedDB ? 'INDEXEDDB_ERROR' : 'GENERIC_ERROR', }; }
 
-const val = await arg.jsonValue().catch(err => { logger.warn(JSON value failed: ${err.message}, { remoteObj }); return { error: err.message, raw: remoteObj.description }; }); const stringified = typeof val === 'object' ? util.inspect(val, { depth: null, maxArrayLength: 50, breakLength: 120 }) : val; return { value: stringified.length > 10000 ? stringified.slice(0, 10000) : stringified, truncated: stringified.length > 10000, type, subtype, raw: remoteObj.description, }; }
+const val = await arg.jsonValue().catch(err => {
+  logger.warn(`JSON value failed: ${err.message}`, { remoteObj });
+  return { error: err.message, raw: remoteObj.description };
+});
+
+const stringified = typeof val === 'object'
+  ? util.inspect(val, { depth: null, maxArrayLength: 50, breakLength: 120 })
+  : val;
+
+return {
+  value: stringified.length > 10000 ? stringified.slice(0, 10000) : stringified,
+  truncated: stringified.length > 10000,
+  type,
+  subtype,
+  raw: remoteObj.description,
+}; }
 
 return { value: remoteObj.value, type }; } catch (err) { logger.error(Failed to process arg: ${err.message}, { remoteObj: arg.remoteObject() }); return { error: err.message, type: 'processingError', raw: arg.toString() }; } }
 
