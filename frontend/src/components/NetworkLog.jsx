@@ -11,14 +11,14 @@ function NetworkLog({ requests }) {
   }
 
   const getStatusIcon = (status) => {
-    const commonProps = { className: 'h-4 w-4 shrink-0', 'aria-hidden': true };
+    const props = { className: 'h-4 w-4 shrink-0', 'aria-hidden': true };
     if (typeof status === 'number' && status >= 400) {
-      return <XCircle {...commonProps} className="text-red-500" />;
+      return <XCircle {...props} className="text-red-500" />;
     }
     if (typeof status === 'number') {
-      return <CheckCircle {...commonProps} className="text-green-500" />;
+      return <CheckCircle {...props} className="text-green-500" />;
     }
-    return <Clock {...commonProps} className="text-gray-400" />;
+    return <Clock {...props} className="text-gray-400" />;
   };
 
   const getBackground = (status) => {
@@ -30,34 +30,31 @@ function NetworkLog({ requests }) {
   };
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-3">
       {requests.map((req, index) => {
         const status = req.status;
         const method = req.method ?? 'GET';
         const url = req.url ?? '(no url)';
-        const time =
-          req.time === -1 || req.time == null ? 'N/A' : `${req.time}ms`;
+        const time = req.time === -1 || req.time == null ? 'N/A' : `${req.time}ms`;
         const type = req.type ?? 'unknown';
 
         return (
           <div
             key={index}
-            className={`p-3 rounded flex items-start gap-3 border-l-4 ${getBackground(
-              status
-            )}`}
+            className={`p-3 rounded flex items-start gap-3 border-l-4 ${getBackground(status)}`}
             role="region"
             aria-label={`Network request: ${method} ${url}`}
           >
             {getStatusIcon(status)}
             <div className="flex-1 overflow-hidden">
-              <p className="font-mono text-sm break-words whitespace-pre-wrap">
+              <p className="font-mono text-sm break-words whitespace-pre-wrap" title={url}>
                 {method} {url}
               </p>
-              <p className="text-xs text-gray-300 mt-1 space-x-2">
-                <span>Status: {status ?? 'N/A'}</span>
-                <span>Type: {type}</span>
-                <span>Time: {time}</span>
-              </p>
+              <div className="flex flex-wrap gap-2 mt-1 text-xs text-white">
+                <span className="bg-gray-700 px-2 py-0.5 rounded">Status: {status ?? 'N/A'}</span>
+                <span className="bg-gray-700 px-2 py-0.5 rounded">Type: {type}</span>
+                <span className="bg-gray-700 px-2 py-0.5 rounded">Time: {time}</span>
+              </div>
             </div>
           </div>
         );
