@@ -1,15 +1,14 @@
 const express = require('express');
 const rateLimit = require('express-rate-limit');
 const NodeCache = require('node-cache');
-const { analyzeUrl } = require('../utils/puppeteer'); // This should be your analyzeUrl function
+const { analyzeUrl } = require('../utils/puppeteer');
 const isValidUrl = require('../utils/isValidUrl');
-const logger = require('../utils/logger'); // Assuming you have a logger utility
+const logger = require('../utils/logger');
 
 const router = express.Router();
 const cache = new NodeCache({ stdTTL: 600, checkperiod: 120 });
 
-// Determine environment
-const isProduction = process.env.NODE_ENV === 'production'; // Check NODE_ENV
+const isProduction = process.env.NODE_ENV === 'production';
 
 const limiter = rateLimit({
   windowMs: 1 * 60 * 1000,
@@ -29,6 +28,7 @@ const allowedOptions = [
   'filterDomains', 'executeScript', 'debug', 'enableWebSocket', 'cpuThrottlingRate',
   'followLinks', 'maxLinks', 'requestTimeout', 'outputDir',
   'includeDomMetrics', 'includePerformanceMetrics',
+  'captureAssetBodies', // ✅ Newly added option
 ];
 
 function validateOptions(options) {
@@ -37,9 +37,7 @@ function validateOptions(options) {
 }
 
 function safeJson(obj) {
-  return JSON.parse(
-    JSON.stringify(obj, (_, value) => (typeof value === 'bigint' ? value.toString() : value))
-  );
+  return JSON.parse(JSON.stringify(obj, (_, value) => (typeof value === 'bigint' ? value.toString() : value)));
 }
 
 router.post('/', limiter, async (req, res) => {
@@ -78,13 +76,14 @@ router.post('/', limiter, async (req, res) => {
       includeDomMetrics: options.includeDomMetrics !== false,
       includePerformanceMetrics: options.includePerformanceMetrics !== false,
       debug: options.debug || true,
+      captureAssetBodies: options.captureAssetBodies || false, // ✅ Added here
     };
 
     const analysisPromise = analyzeUrl(url, analysisOptions);
     const timeoutPromise = new Promise((_, reject) =>
-      // Increased timeout to 5 minutes (300 seconds)
       setTimeout(() => reject(new Error('Analysis timed out')), 600000)
     );
+
     const analysisData = await Promise.race([analysisPromise, timeoutPromise]);
 
     if (analysisData.error) {
@@ -96,9 +95,8 @@ router.post('/', limiter, async (req, res) => {
       });
     }
 
-    // Handle fallback case from launchBrowserWithRetries
     if (!analysisData.logs && !analysisData.requests) {
-      logger.request(req, `Analysis fallback triggered for ${url} due to initialization failure`, 'warn');
+      logger.request(req, `Analysis fallback triggered for ${url}`, 'warn');
       return res.status(200).json({
         title: 'Analysis Incomplete',
         html: '',
@@ -113,7 +111,6 @@ router.post('/', limiter, async (req, res) => {
       });
     }
 
-    // Ensure response matches frontend expectations
     const responseData = {
       title: analysisData.title || 'Untitled Page',
       html: analysisData.html || '',
@@ -133,7 +130,6 @@ router.post('/', limiter, async (req, res) => {
     return res.json(safeJson(responseData));
   } catch (error) {
     logger.request(req, `Unexpected error: ${url} | ${error.stack || error.message}`, 'error');
-
     if (!isProduction) {
       return res.status(500).json({
         error: 'Analysis failed (Backend Error)',
@@ -145,56 +141,6 @@ router.post('/', limiter, async (req, res) => {
         error: 'Analysis failed',
         message: 'An unexpected server error occurred.',
       });
-    }
-  }
-});
-
-router.get('/', limiter, async (req, res) => {
-  const { url } = req.query;
-
-  if (!url || !isValidUrl(url)) {
-    logger.request(req, `Invalid GET request: ${url}`, 'warn');
-    return res.status(400).json({ error: 'Invalid or missing URL in query parameters.' });
-  }
-
-  try {
-    logger.request(req, `GET analysis started: ${url}`, 'info');
-    const analysisData = await analyzeUrl(url, { debug: true, includeDomMetrics: true, includePerformanceMetrics: true });
-
-    if (analysisData.error) {
-      logger.request(req, `GET analysis failed: ${url} | ${analysisData.error}`, 'error');
-      return res.status(500).json({
-        error: 'Analysis failed',
-        message: analysisData.message || analysisData.error,
-        details: analysisData.details,
-      });
-    }
-
-    const responseData = {
-      title: analysisData.title || 'Untitled Page',
-      html: analysisData.html || '',
-      screenshot: analysisData.screenshot || '',
-      logs: Array.isArray(analysisData.logs) ? analysisData.logs : [],
-      requests: Array.isArray(analysisData.requests) ? analysisData.requests : [],
-      performance: analysisData.performance || { domContentLoaded: -1, load: -1, firstPaint: -1, largestContentfulPaint: -1 },
-      domMetrics: analysisData.domMetrics || {},
-      warning: analysisData.warning || null,
-      webSocket: analysisData.webSocket || { url: 'ws://localhost:8081', actions: ['click', 'reload'] },
-      summary: analysisData.summary || { errors: 0, warnings: 0, requests: 0, loadTime: 0 },
-    };
-
-    logger.request(req, `GET analysis completed: ${url}`, 'info');
-    return res.json(safeJson(responseData));
-  } catch (error) {
-    logger.request(req, `Unexpected GET error: ${url} | ${error.stack || error.message}`, 'error');
-    if (!isProduction) {
-      return res.status(500).json({
-        error: 'Internal server error (Backend GET Error)',
-        message: error.message,
-        details: error.stack,
-      });
-    } else {
-      return res.status(500).json({ error: 'Internal server error' });
     }
   }
 });
