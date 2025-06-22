@@ -7,7 +7,6 @@ const path = require('path');
 const fs = require('fs');
 const { processConsoleArg, formatAndLogMessage } = require('./enhancedLogging');
 
-// Apply Puppeteer plugins
 puppeteer.use(StealthPlugin());
 puppeteer.use(AdblockerPlugin({ blockTrackers: true }));
 
@@ -19,7 +18,9 @@ async function launchBrowserWithRetries({
   debug = false,
   blockHosts = true,
   sessionId = Date.now(),
+  captureAssetBodies = false,
 } = {}) {
+  let sessionDir;
   for (let i = 0; i < retries; i++) {
     let browser;
     try {
@@ -31,18 +32,18 @@ async function launchBrowserWithRetries({
           '--no-sandbox',
           '--disable-setuid-sandbox',
           '--disable-network',
-          '--disable-gpu', // Reduce resource usage
+          '--disable-gpu',
         ],
-        ignoreHTTPSErrors: true, // Bypass network errors
+        ignoreHTTPSErrors: true,
         timeout: 120000,
-        protocolTimeout: 600000, // Reduced to 30 seconds since network is disabled
+        protocolTimeout: 600000,
         executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
       });
       const endTime = Date.now();
-      debug && logger.info(`Browser launched in ${((endTime - startTime) / 1000).toFixed(2)} seconds`);
+      debug && logger.info(`Browser launched in ${((endTime - startTime) / 1000).toFixed(2)}s`);
 
       const page = await browser.newPage();
-      const sessionDir = path.join(__dirname, '../../sessions', String(sessionId));
+      sessionDir = path.join(__dirname, '../../sessions', String(sessionId));
       fs.mkdirSync(sessionDir, { recursive: true });
 
       const collectedConsoleLogs = [];
@@ -52,30 +53,23 @@ async function launchBrowserWithRetries({
 
       if (customDevice) {
         await page.emulate(customDevice);
-        debug && logger.info(`Using custom device profile`);
+        debug && logger.info('Using custom device profile');
       } else if (device && MOBILE_DEVICES[device]) {
         await page.emulate(MOBILE_DEVICES[device]);
         debug && logger.info(`Emulated mobile device: ${device}`);
       } else if (userAgent && DESKTOP_USER_AGENTS[userAgent]) {
         await page.setUserAgent(DESKTOP_USER_AGENTS[userAgent]);
+        await page.setViewport({ width: 1920, height: 1080, deviceScaleFactor: 1, isMobile: false, hasTouch: false });
         debug && logger.info(`Applied desktop user agent: ${userAgent}`);
-        await page.setViewport({
-          width: 1920,
-          height: 1080,
-          deviceScaleFactor: 1,
-          isMobile: false,
-          hasTouch: false,
-        });
       }
 
-      // Network emulation and monitoring disabled
       debug && logger.info('Network monitoring and emulation disabled to avoid timeouts');
 
       if (blockHosts) {
         await page.setRequestInterception(true);
         page.on('request', (req) => {
           const url = req.url();
-          if (BLOCKED_HOSTS.some((host) => url.includes(host))) {
+          if (BLOCKED_HOSTS.some(host => url.includes(host))) {
             debug && logger.info(`Blocked request: ${url}`);
             return req.abort();
           }
@@ -83,38 +77,74 @@ async function launchBrowserWithRetries({
         });
       }
 
+      // ✅ Capture request completions (with asset type info)
       page.on('requestfinished', async (req) => {
         const res = req.response();
         if (!res) return;
-        collectedRequests.push({
+
+        const entry = {
           url: req.url(),
           method: req.method(),
           status: res.status(),
           headers: res.headers(),
-        });
-        debug && logger.debug(`REQ ${res.status()} ${req.method()} ${req.url()}`);
+          resourceType: req.resourceType(),
+          fromCache: res.fromCache(),
+          fromServiceWorker: res.fromServiceWorker(),
+        };
+        collectedRequests.push(entry);
+        debug && logger.debug(`[${entry.resourceType.toUpperCase()}] ${entry.status} ${entry.method} ${entry.url}`);
       });
 
+      // ❌ Capture failed asset loads
+      page.on('requestfailed', (req) => {
+        const failure = req.failure();
+        collectedRequests.push({
+          url: req.url(),
+          method: req.method(),
+          status: 'FAILED',
+          errorText: failure?.errorText || 'unknown',
+          resourceType: req.resourceType(),
+        });
+        debug && logger.warn(`❌ Failed request (${req.resourceType()}): ${req.url()} - ${failure?.errorText}`);
+      });
+
+      // 📦 Optional: capture asset body content (JS/CSS only)
+      page.on('response', async (res) => {
+        const req = res.request();
+        const type = req.resourceType();
+        if (!captureAssetBodies) return;
+        if (['script', 'stylesheet'].includes(type)) {
+          try {
+            const content = await res.text();
+            const ext = type === 'script' ? 'js' : 'css';
+            const safeName = req.url().replace(/[^a-z0-9]/gi, '_').slice(0, 100);
+            const filePath = path.join(sessionDir, `${safeName}.${ext}`);
+            fs.writeFileSync(filePath, content);
+            debug && logger.info(`Saved ${type} body: ${filePath}`);
+          } catch (e) {
+            logger.warn(`Failed to save asset body: ${req.url()} - ${e.message}`);
+          }
+        }
+      });
+
+      // 🧠 Capture console logs with source file
       page.on('console', async (msg) => {
-        const type = msg.type();
         const location = msg.location();
         const entry = {
-          type,
+          type: msg.type(),
           text: msg.text(),
           timestamp: Date.now(),
           args: [],
           url: location?.url || '',
           lineNumber: location?.lineNumber || -1,
           columnNumber: location?.columnNumber || -1,
+          sourceFile: location?.url || 'unknown',
         };
 
         try {
           entry.args = await Promise.all(msg.args().map(arg => processConsoleArg(arg, debug)));
           collectedConsoleLogs.push(entry);
-
-          if (debug) {
-            formatAndLogMessage(entry, debug);
-          }
+          debug && formatAndLogMessage(entry, debug);
         } catch (err) {
           logger.warn(`Console processing error: ${err.message}`);
           entry.args = [`Error: ${err.message}`];
@@ -132,10 +162,7 @@ async function launchBrowserWithRetries({
         });
         try {
           if (!page.isClosed()) {
-            await page.screenshot({
-              path: path.join(sessionDir, `pageerror-${Date.now()}.png`),
-              fullPage: true,
-            });
+            await page.screenshot({ path: path.join(sessionDir, `pageerror-${Date.now()}.png`), fullPage: true });
           }
         } catch {}
       });
@@ -150,24 +177,15 @@ async function launchBrowserWithRetries({
         });
         try {
           if (!page.isClosed()) {
-            await page.screenshot({
-              path: path.join(sessionDir, `unhandled-${Date.now()}.png`),
-              fullPage: true,
-            });
+            await page.screenshot({ path: path.join(sessionDir, `unhandled-${Date.now()}.png`), fullPage: true });
           }
         } catch {}
       });
 
       page.on('close', () => {
         try {
-          fs.writeFileSync(
-            path.join(sessionDir, 'network-log.json'),
-            JSON.stringify(collectedRequests, null, 2)
-          );
-          fs.writeFileSync(
-            path.join(sessionDir, 'console-log.json'),
-            JSON.stringify(collectedConsoleLogs, null, 2)
-          );
+          fs.writeFileSync(path.join(sessionDir, 'network-log.json'), JSON.stringify(collectedRequests, null, 2));
+          fs.writeFileSync(path.join(sessionDir, 'console-log.json'), JSON.stringify(collectedConsoleLogs, null, 2));
         } catch (e) {
           logger.error(`Failed to write logs: ${e.message}`);
         }
@@ -178,10 +196,10 @@ async function launchBrowserWithRetries({
       logger.warn(`Retry ${i + 1}/${retries} failed: ${err.message}`);
       if (browser) await browser.close();
       if (i === retries - 1) {
-        const elapsedTime = Date.now() - startTime;
-        logger.warn(`Total time for ${retries} attempts: ${elapsedTime / 1000} seconds`);
+        const elapsedTime = Date.now() - (startTime || Date.now());
+        logger.warn(`Total time for ${retries} attempts: ${elapsedTime / 1000}s`);
         debug && logger.warn('Proceeding without browser instance due to repeated failures.');
-        return { browser: null, page: null, sessionDir, collectedConsoleLogs: [], collectedRequests: [] }; // Fallback to proceed
+        return { browser: null, page: null, sessionDir, collectedConsoleLogs: [], collectedRequests: [] };
       }
       await new Promise((r) => setTimeout(r, 2000));
     }
